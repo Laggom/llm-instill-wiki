@@ -1,0 +1,20 @@
+# 개인 콘텐츠 — schema 만 public, 본인 wiki 는 private 유지
+raw/
+wiki/
+instill/
+chats/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
