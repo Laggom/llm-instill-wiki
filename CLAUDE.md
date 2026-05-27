@@ -209,6 +209,24 @@ A card's `solo-target` is the *final* depth to reach. Start at recall and climb 
 - **The wiki is read-only during a session.** Scheduler calls only mutate `instill/_deck.json`; `wiki/` and `raw/` are untouched.
 - **Interleaving is the default.** Topic-scoped (`instill <topic>`) is allowed but Bjork supports mixing.
 
+**Question quality** (critical — bad questions kill the session):
+
+A good instill question is **context-rich, single-answer, and concept-probing**. The card's `claim` is the *target understanding* — the question must elicit that specific understanding, not let the user guess at what you're asking.
+
+Required:
+- **Set context in 1–2 sentences** before the question proper. A concrete scenario, an analogy, or a specific comparison. Bare interrogatives like "X 가 뭐예요?" or "왜 필요해요?" are too thin — the user has no anchor for what's being probed.
+- **Converge on a single defensible answer.** If two well-informed readers could answer differently and both be valid, the question is too open. Rephrase until there is one obvious right answer (the card's claim, or a tight equivalent).
+- **Probe the concept, not a buzzword.** Don't ask the user to retrieve a specific term like "active recall" by name — ask them to reason about the underlying mechanism and let the term emerge.
+
+Forbidden:
+- Vague open-enders: "왜 X 가 필요한가요?", "X 는 어떤 거예요?", "X 의 핵심이 뭐죠?"
+- Questions whose answer-space is unbounded ("어떻게 생각하세요?", "한 줄로 정리하면?")
+- Pure name-recall ("이걸 뭐라고 부르죠?") unless the term itself is the card's claim.
+
+Example transformation:
+- ✗ Too thin: "instill 이 query 와 별도로 왜 필요한가요?"
+- ✓ Rich + converging: "교과서를 5번 정독한 학생 A 와, 1번 읽고 4번은 책 덮고 머릿속에서 꺼내려 노력한 학생 B 가 있어요. 일주일 뒤 누가 더 잘 기억할까요? 그리고 이 결과가 instill 이 query 와 별도 동작인 이유와 어떻게 연결되나요?"
+
 **Backlog overflow**: if due > 8, the scheduler sorts by priority (lapses → most overdue → importance) and returns only the top. Untreated due cards do not disappear — they roll forward.
 
 **Narrative notes — `instill/<topic>.md`** (lazy-load):
