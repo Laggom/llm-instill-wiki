@@ -116,7 +116,7 @@ status: stub | draft | stable
 - **Mastery learning** — 단발 정답 ≠ 마스터. 간격을 둔 다수 성공.
 - **SOLO taxonomy** — 깊이 5단계 (recall / uni / multi / relational / transfer).
 
-**스케줄러**: `tools/instill_sched.py` 가 FSRS 계산 담당. LLM 은 CLI 호출만, 수식 직접 계산 금지. 자세한 설계는 [`docs/specs/2026-05-27-instill-v2-design.md`](docs/specs/2026-05-27-instill-v2-design.md).
+**스케줄러**: `tools/instill_sched.py` 가 FSRS 계산 담당. LLM 은 CLI 호출만, 수식 직접 계산 금지.
 
 **세션 흐름**:
 

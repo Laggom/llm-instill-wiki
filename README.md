@@ -51,7 +51,6 @@ ingest 와 query 는 흔합니다. instill 이 다른 점이에요.
 ├── README.md       ← 지금 읽고 계신 이 문서.
 ├── tools/
 │   └── instill_sched.py    ← FSRS 스케줄러 (stdlib only)
-├── docs/specs/             ← 설계 결정 기록
 ├── raw/            ← 본인의 원본 소스 (이 repo 에는 포함 안 됨)
 ├── wiki/           ← LLM 이 정리한 페이지 (이 repo 에는 포함 안 됨)
 └── instill/        ← 카드 스케줄 + 토픽별 학습 노트 (이 repo 에는 포함 안 됨)
@@ -102,7 +101,6 @@ mkdir raw wiki instill
 ## 더 알아보기
 
 - 운영 규칙 전체: [CLAUDE.md](CLAUDE.md)
-- instill 의 설계 결정 배경: [docs/specs/2026-05-27-instill-v2-design.md](docs/specs/2026-05-27-instill-v2-design.md)
 - 원본 영감: [Karpathy 의 LLM Wiki gist](https://gist.github.com/karpathy)
 
 질문·제안 있으시면 issue 로 남겨주세요.
@@ -189,7 +187,6 @@ Do **not** create any sample raw/wiki content unless the user asks. The schema i
 ## Source of truth
 
 - **`CLAUDE.md`** — the operative schema. Read it first. Defines four workflows: ingest, query, instill, lint. Sections §1–§9 specify directory layout, page format, naming, workflows, principles, and user commands.
-- **`docs/specs/2026-05-27-instill-v2-design.md`** — design rationale for the instill v2 loop (FSRS scheduling, SOLO depth ladder, card decomposition, 5-min session budget). Read when modifying instill logic.
 
 If `CLAUDE.md` and this README disagree, `CLAUDE.md` wins.
 
@@ -207,7 +204,6 @@ If `CLAUDE.md` and this README disagree, `CLAUDE.md` wins.
 CLAUDE.md                       schema (operative rules)
 README.md                       human + this agent guide
 tools/instill_sched.py          FSRS-4.5 scheduler (stdlib only, CLI)
-docs/specs/                     design docs
 raw/        (gitignored)        immutable source clippings
 wiki/       (gitignored)        LLM-maintained pages: sources/, concepts/, entities/, index.md, log.md
 instill/    (gitignored)        _deck.json (FSRS state) + per-topic narrative notes
