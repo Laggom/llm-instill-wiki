@@ -65,15 +65,20 @@ ingest, query, lint 는 흔합니다. instill 이 다른 점이에요.
 
 다른 코딩 CLI 에서도 쓰실 수 있습니다. 다만 약간의 손이 필요해요.
 
-- **Cursor / Codex / 기타 AGENTS.md 호환 도구** — `CLAUDE.md` 를 `AGENTS.md` 로 복사하거나 심볼릭 링크 거시면 됩니다. 두 파일의 역할이 사실상 같습니다.
-  ```bash
-  # macOS / Linux
-  ln -s CLAUDE.md AGENTS.md
-  # Windows (PowerShell, 관리자 권한)
-  New-Item -ItemType SymbolicLink -Path AGENTS.md -Target CLAUDE.md
-  ```
-- **Gemini CLI** — `CLAUDE.md` 를 `GEMINI.md` 로 같은 방식으로 처리.
-- **기타 환경** — 자동 컨텍스트 로드가 없는 도구라면 매 세션 시작 시 `CLAUDE.md` 내용을 시스템 프롬프트로 직접 붙여 넣으셔야 합니다. 번거롭지만 동작은 합니다.
+`CLAUDE.md` 를 source 로 두고, 도구가 기대하는 파일명으로 **그냥 복사** 하시면 됩니다.
+
+- **Cursor / Codex / 기타 AGENTS.md 호환 도구** → `AGENTS.md` 로 복사
+- **Gemini CLI** → `GEMINI.md` 로 복사
+- **기타 환경 (자동 컨텍스트 로드 없음)** → 매 세션 시작 시 `CLAUDE.md` 내용을 시스템 프롬프트에 직접 붙여 넣기
+
+```bash
+# macOS / Linux / Windows 어디서나
+cp CLAUDE.md AGENTS.md     # 또는 GEMINI.md
+```
+
+심볼릭 링크는 권장하지 않습니다. Windows 에선 개발자 모드/관리자 권한이 필요하고, Dropbox·OneDrive 같은 클라우드 동기화에서 깨지고, git clone 시 OS 간 호환성 문제가 생길 수 있습니다. 그냥 복사가 안전합니다.
+
+복사를 쓰시면 schema 를 손볼 때마다 다시 복사해야 한다는 작은 부담이 있지만, schema 자체는 자주 바뀌지 않으니 실제로는 거의 신경 안 쓰셔도 됩니다.
 
 `tools/instill_sched.py` 는 **Python 3.10+** 필요합니다. 표준 라이브러리만 쓰니까 별도 패키지 설치는 없어요.
 
@@ -141,21 +146,19 @@ mkdir -p wiki/sources wiki/concepts wiki/entities
 | Host tool | Expected filename | Action |
 |---|---|---|
 | Claude Code | `CLAUDE.md` | already correct — no action |
-| Cursor, Codex, generic AGENTS.md | `AGENTS.md` | symlink or copy `CLAUDE.md` → `AGENTS.md` |
-| Gemini CLI | `GEMINI.md` | symlink or copy `CLAUDE.md` → `GEMINI.md` |
+| Cursor, Codex, generic AGENTS.md | `AGENTS.md` | copy `CLAUDE.md` → `AGENTS.md` |
+| Gemini CLI | `GEMINI.md` | copy `CLAUDE.md` → `GEMINI.md` |
 | Other / unknown | n/a | tell user to paste `CLAUDE.md` contents into their system prompt each session |
 
-Symlink commands (cross-platform):
+Use a plain copy, not a symlink:
 
 ```bash
-# macOS / Linux
-ln -s CLAUDE.md AGENTS.md
-
-# Windows PowerShell (Developer Mode on, or admin shell)
-New-Item -ItemType SymbolicLink -Path AGENTS.md -Target CLAUDE.md
+cp CLAUDE.md AGENTS.md     # or GEMINI.md
 ```
 
-If symlinks fail (e.g., Windows without dev mode), fall back to `cp CLAUDE.md AGENTS.md` and warn the user that future schema edits must be propagated.
+Symlinks are not recommended. On Windows they require Developer Mode or admin rights, break under cloud-sync clients (Dropbox/OneDrive/iCloud), and behave inconsistently across `git clone` between OSes. Copy is portable.
+
+Warn the user that future edits to `CLAUDE.md` must be propagated to the copied file. The schema rarely changes, so this is light overhead in practice.
 
 **4. Initialize empty wiki scaffolding** so subsequent workflows have files to update:
 
