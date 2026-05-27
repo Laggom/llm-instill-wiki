@@ -1,277 +1,296 @@
-# CLAUDE.md — LLM Wiki 운영 규칙
+# CLAUDE.md — LLM Wiki Operating Schema
 
-이 파일은 본 wiki의 **schema**다. Claude Code가 이 wiki를 유지·확장할 때 따라야 할 구조, 형식, 워크플로우를 정의한다. Karpathy의 [LLM Wiki 패턴](raw/karpathy-llm-wiki.md)을 기반으로 한다.
+This file is the **schema** for this wiki. It defines the structure, format, and workflows the LLM must follow when maintaining and extending the wiki. Based on Karpathy's [LLM Wiki pattern](https://gist.github.com/karpathy).
 
-> 원칙: 사람은 큐레이션·질문·방향 설정만 한다. LLM이 wiki 전체를 작성·유지한다.
+> Principle: the human curates, asks, and sets direction. The LLM writes and maintains the entire wiki.
 
 ---
 
-## 1. 디렉터리 구조
+## 0. Language
+
+- This schema is written in English for token efficiency and broad agent compatibility across tools.
+- **Respond to the user in Korean (존댓말 — polite form)** unless explicitly told otherwise.
+- Wiki page titles, claims, and content may be in any language — match the source. The schema (this file, page frontmatter keys, scheduler IDs) stays in English.
+- User commands listed in §8 are in Korean by convention but the LLM should also recognize obvious English equivalents (`ingest X`, `query Q`, `lint`, etc.).
+
+---
+
+## 1. Directory layout
 
 ```
 .
-├── CLAUDE.md          # 이 파일 — schema/운영 규칙
-├── README.md          # 사람을 위한 안내
-├── raw/               # 원본 소스 (immutable, 수정 금지)
-│   ├── *.md           # 클리핑한 글, 논문, 노트
-│   └── assets/        # 이미지·첨부 (필요 시 생성)
-├── wiki/              # LLM이 작성/유지하는 마크다운 (mutable)
-│   ├── index.md       # 전체 페이지 카탈로그
-│   ├── log.md         # 시간순 작업 기록 (append-only)
-│   ├── sources/       # 소스별 요약 페이지 (1 source = 1 page)
-│   ├── concepts/      # 개념 페이지 (idea, theory, pattern)
-│   └── entities/      # 사람·도구·조직·제품 페이지
-└── instill/           # instill 세션 진척도 (lazy-load, 주제별 1파일)
-    └── <topic>.md     # 예: cc-memory.md
+├── CLAUDE.md          # this file — schema / operating rules
+├── README.md          # human-facing intro + agent installation guide
+├── tools/
+│   └── instill_sched.py   # FSRS-4.5 scheduler (stdlib only)
+├── raw/               # source clippings (IMMUTABLE — never edit or delete)
+│   ├── *.md           # articles, papers, notes
+│   └── assets/        # images / attachments (create if needed)
+├── wiki/              # LLM-maintained markdown (mutable)
+│   ├── index.md       # full page catalog
+│   ├── log.md         # append-only activity log
+│   ├── sources/       # one page per raw source
+│   ├── concepts/      # ideas, theories, patterns
+│   └── entities/      # people, tools, orgs, products
+└── instill/           # learning state
+    ├── _deck.json     # FSRS card state (machine-owned)
+    └── <topic>.md     # narrative coaching notes per topic (lazy-load)
 ```
 
-향후 필요하면 `wiki/comparisons/`, `wiki/timelines/` 등을 추가할 수 있다. 새 카테고리를 만들 때는 이 파일을 함께 갱신한다.
+New categories such as `wiki/comparisons/` or `wiki/timelines/` may be added later. When adding a category, update this file in the same change.
 
 ---
 
-## 2. 페이지 형식
+## 2. Page format
 
-### 2.1 YAML frontmatter (필수)
+### 2.1 YAML frontmatter (required)
 
 ```yaml
 ---
-title: 페이지 제목
+title: Page title
 type: source | concept | entity
 tags: [tag1, tag2]
 created: YYYY-MM-DD
 updated: YYYY-MM-DD
-sources: 1            # 이 페이지를 뒷받침하는 raw/ 소스 개수
+sources: 1            # how many raw/ sources back this page
 status: stub | draft | stable
+instill:              # optional — see §4.4
+  - id: cc-mem-001
+    claim: "single-line testable assertion"
+    importance: high | med | low
+    solo-target: recall | uni | multi | relational | transfer
+    skip: false
 ---
 ```
 
-- `type` 은 페이지가 위치한 디렉터리와 일치해야 한다.
-- `entities/` 의 경우 `kind: person | tool | org | product` 를 추가로 둘 수 있다.
-- 새 소스로 페이지를 갱신할 때마다 `updated` 와 `sources` 를 손본다.
+- `type` must match the directory the page sits in.
+- For `entities/` pages, add `kind: person | tool | org | product`.
+- Bump `updated` and `sources` whenever a new raw source extends the page.
 
-### 2.2 본문 구조
+### 2.2 Body structure
 
 ```markdown
-# 페이지 제목
+# Page title
 
-## 한 줄 요약
-페이지가 무엇을 다루는지 한 문장으로.
+## TL;DR
+One sentence summary of what this page covers.
 
-## 본문
-자유 구조. 소제목은 페이지 성격에 맞춰 자유롭게.
+## Body
+Free structure. Use subheadings as fits the topic.
 
-## 관련 페이지
-- [[concepts/foo]] — 왜 관련 있는지 한 줄
-- [[entities/bar]] — 왜 관련 있는지 한 줄
+## Related
+- [[concepts/foo]] — one-line note on the relation
+- [[entities/bar]] — one-line note on the relation
 
-## 출처
-- [karpathy-llm-wiki](../../raw/karpathy-llm-wiki.md) — 어느 부분에서 인용
+## Sources
+- [karpathy-llm-wiki](../../raw/karpathy-llm-wiki.md) — what was cited
 ```
 
-링크는 Obsidian-style `[[wiki/path/page]]` 와 일반 마크다운 `[text](path)` 둘 다 허용한다. 한 페이지 안에서는 일관되게 쓴다.
+Both Obsidian-style `[[wiki/path/page]]` and plain markdown `[text](path)` are allowed. Be consistent within a page.
 
 ---
 
-## 3. 명명 규칙
+## 3. Naming
 
-- 파일명: `kebab-case.md` (영문 슬러그). 검색·링크 편의 때문.
-- 제목(`title`)은 한국어 가능.
-- 사람 페이지: `entities/firstname-lastname.md` (예: `entities/andrej-karpathy.md`).
-- 소스 페이지 파일명: raw 파일과 1:1 매칭되도록 같은 슬러그 사용.
+- File names: `kebab-case.md` (ASCII slug). Eases search and linking.
+- `title:` in frontmatter may be in any language.
+- People pages: `entities/firstname-lastname.md` (e.g., `entities/andrej-karpathy.md`).
+- Source pages: file slug must match the raw file 1:1.
 
 ---
 
-## 4. 워크플로우
+## 4. Workflows
 
-### 4.1 Ingest — 새 소스 추가
+### 4.1 Ingest — adding a new source
 
-1. 사용자가 `raw/<slug>.md` (또는 PDF 등) 에 파일 저장.
-2. LLM은 raw 파일을 **읽기 전용**으로 열고 핵심 내용을 추출한다.
-3. `wiki/sources/<slug>.md` 생성. 요약, 핵심 주장, 인용할만한 문장.
-4. 등장한 개념·인물·도구별로 `wiki/concepts/`·`wiki/entities/` 페이지를 새로 만들거나 업데이트.
-5. 다른 페이지에서 새 정보와 모순되는 부분이 있으면 양쪽에 메모를 남긴다 (`> ⚠ 2026-05-25: source X 와 충돌, 정리 필요`).
-6. `wiki/index.md` 에 새 페이지 항목 추가.
-7. **Instill 카드 추출** — 새로/갱신된 페이지마다 frontmatter 의 `instill:` 배열에 원자적 주장(카드)을 추가한다. 각 카드는 `id`, `claim` (한 줄), `importance` (high/med/low), `solo-target` (recall/uni/multi/relational/transfer). id 는 wiki 전역 unique (예: `cc-mem-001`). 추출 후 카드마다 `python tools/instill_sched.py enroll --id <id> --importance <h/m/l> --topic <topic>` 호출하여 deck 에 등록.
-8. `wiki/log.md` 에 ingest 항목 append (신규 카드 개수 포함).
+1. The user drops a file into `raw/<slug>.md` (or PDF, etc.).
+2. The LLM opens the raw file **read-only** and extracts the key content.
+3. Create `wiki/sources/<slug>.md` with summary, key claims, and quotable lines.
+4. For each concept, person, or tool mentioned, create or update a page under `wiki/concepts/` or `wiki/entities/`.
+5. If new information contradicts something on another page, leave a note on both sides (`> ⚠ YYYY-MM-DD: conflicts with source X, needs reconciliation`).
+6. Add new pages to `wiki/index.md`.
+7. **Instill card extraction** — for each new or updated page, populate the `instill:` array in its frontmatter with atomic claims (cards). Each card needs `id` (wiki-globally unique, e.g., `cc-mem-001`), `claim` (one line, testable), `importance` (high/med/low), and `solo-target` (recall/uni/multi/relational/transfer). For each new card, call `python tools/instill_sched.py enroll --id <id> --importance <h/m/l> --topic <topic>` to register it in the scheduler.
+8. Append an entry to `wiki/log.md` (include new card count).
 
-한 소스 ingest 시 10~15개 페이지를 건드릴 수 있다. 정상이다. 카드 추출은 사용자 승인 없이 자동 — drop 은 instill 세션 시작 시 한다 (§4.3).
+Touching 10–15 pages during one ingest is normal. Card extraction is automatic and needs no user approval — the user can drop unwanted cards at the start of the next instill session (see §4.4).
 
-### 4.2 Query — 질문 응답
+### 4.2 Query — answering a question
 
-1. `wiki/index.md` 를 먼저 읽고 관련 페이지를 식별한다.
-2. 관련 페이지를 읽어 합성된 답변을 만든다. 모든 주장에 인용을 단다 (`[[concepts/foo]]`).
-3. **답변이 재사용 가치가 있으면 wiki 페이지로 환원한다.** 비교표·분석·연결 발견 등은 `wiki/concepts/<topic>-vs-<topic>.md` 또는 `wiki/concepts/<insight>.md` 로 저장하고 index·log 갱신.
-4. `wiki/log.md` 에 query 항목 append.
+1. Read `wiki/index.md` first to identify relevant pages.
+2. Read those pages and synthesize an answer. Cite every claim with `[[concepts/foo]]` or similar links.
+3. **If the synthesized answer has reuse value, promote it to a wiki page.** Comparison tables, analyses, newly discovered connections — save to `wiki/concepts/<topic>-vs-<topic>.md` or `wiki/concepts/<insight>.md` and update index + log.
+4. Append an entry to `wiki/log.md`.
 
-### 4.3 Instill — 사용자에게 지식 주입 (v2: FSRS + SOLO)
+### 4.3 Lint — periodic housekeeping
 
-**언제**: 사용자가 `instill` (혼합 deck) 또는 `instill <주제>` (토픽 한정) 라고 할 때.
+Triggered by `lint` or `wiki 점검해줘`. Detect:
 
-**query 와의 차이**: query 는 LLM 이 답한다. instill 은 **사용자가 답하고 LLM 이 평가한다**.
+- **Contradictions** — two pages making opposing claims about the same fact.
+- **Stale claims** — old claims that a newer source would update.
+- **Orphan pages** — pages not linked from anywhere.
+- **Missing pages** — concepts mentioned repeatedly without a dedicated page.
+- **Missing cross-refs** — two pages clearly related but with no link between them.
+- **Data gaps** — holes that a web search could fill.
 
-**v2 의 토대 (학습과학)**:
-- **Testing effect** — retrieval > 재학습 (Roediger & Karpicke 2006)
-- **Spacing effect** — 간격 두면 정착률 ↑ (Cepeda et al. 2008). 스케줄링은 **FSRS-4.5** (Anki 채택).
-- **Desirable difficulties** — 인터리빙 기본, 약간 실패할 정도 적정 (Bjork).
-- **Mastery learning** — 단발 정답 ≠ 마스터. 간격을 둔 다수 성공.
-- **SOLO taxonomy** — 깊이 5단계 (recall / uni / multi / relational / transfer).
+Record findings in `wiki/log.md` under a `lint` entry. Auto-fix the mechanical issues (e.g., add a backlink for an orphan). Surface judgment calls (contradictions) to the user.
 
-**스케줄러**: `tools/instill_sched.py` 가 FSRS 계산 담당. LLM 은 CLI 호출만, 수식 직접 계산 금지.
+### 4.4 Instill — pushing knowledge into the user (FSRS + SOLO)
 
-**세션 흐름**:
+**Trigger**: the user says `instill` (mixed deck) or `instill <topic>` (topic-scoped).
 
-1. **오늘의 큐 산출**: `python tools/instill_sched.py today [--topic X] --limit 8 --new-limit 3` 호출. due + new_candidates JSON 받음.
-2. **신규 후보 drop 단계**: new_candidates 가 있으면 사용자에게 목록 보여주고 "빼고 싶은 게 있나요?" 묻기. drop 된 것은 `python tools/instill_sched.py skip --id X`.
-3. **세션 시작**: 최대 8장 (due + 신규 ≤ 3). 인터리빙 순서.
-4. **카드마다**:
-   - SOLO target level 에 맞는 질문 유형 (아래 표).
-   - 사용자 답 → 답변 길이는 짧게, 한 카드 = 한 질문 호흡.
-   - LLM 이 grade 판정 → `python tools/instill_sched.py review --id X --grade {again,hard,good,easy}`.
-5. **8장 끝**: "더 할래?" → `more` 면 +4장. 아니면 종료.
-6. **세션 종료**: 다룬 토픽별 `instill/<topic>.md` 갱신 (서사 메모 — 마스터, 진행 중, 약점, 강점). `wiki/log.md` 에 1줄.
+**How it differs from query**: in query, the LLM answers. In instill, **the user answers and the LLM grades**.
+
+**Foundations (learning science)**:
+- **Testing effect** — retrieval beats re-reading (Roediger & Karpicke 2006).
+- **Spacing effect** — spaced practice retains more than massed (Cepeda et al. 2008). Scheduling uses **FSRS-4.5** (the algorithm Anki adopted in 2024).
+- **Desirable difficulties** — interleave topics; aim for a small failure rate (Bjork).
+- **Mastery learning** — one correct retrieval ≠ mastered. Multiple successes across spaced sessions are required.
+- **SOLO taxonomy** — five levels of depth: recall / uni / multi / relational / transfer (Biggs).
+
+**Scheduler**: `tools/instill_sched.py` owns all FSRS math. The LLM only calls the CLI — never compute stability/difficulty in-context.
+
+**Session flow**:
+
+1. **Pull today's queue**: `python tools/instill_sched.py today [--topic X] --limit 8 --new-limit 3`. Receives JSON with `due` and `new_candidates`.
+2. **New-card drop step**: if `new_candidates` is non-empty, show the list to the user and ask "any you'd like to skip?". For each dropped card, call `python tools/instill_sched.py skip --id X`.
+3. **Begin the session**: up to 8 cards (due + new ≤ 3). Interleave the order.
+4. **Per card**:
+   - Pick a question type matching the card's current SOLO level (see table below).
+   - User answers. Keep the LLM side short — one card = one question's worth of exchange.
+   - LLM assigns a grade, then calls `python tools/instill_sched.py review --id X --grade {again,hard,good,easy}`.
+5. **After 8 cards**: ask "more?". If `more`, add 4 more. Otherwise end.
+6. **Session end**: update `instill/<topic>.md` for each touched topic with narrative notes (mastered, in-progress, weaknesses, strengths). Append one line to `wiki/log.md`.
 
 **Grade rubric**:
 
-| Grade | 기준 | 효과 |
+| Grade | Criterion | Effect |
 |---|---|---|
-| **Again** | 핵심 누락·오답. counter-question/힌트 후에도 못 잡음. | lapse +1, 짧은 간격 재등장. SOLO target 한 단계 ↓ 후보. |
-| **Hard** | 부분적. 힌트 한 번에 잡음. | 같은 SOLO target, 간격 살짝만 늘림. |
-| **Good** | 정확. | 같은 target, 표준 간격. |
-| **Easy** | 정확 + 연결·응용 자발적. | 한 단계 ↑ 후보. 큰 간격. |
+| **Again** | Core missed or wrong. Still wrong after a counter-question/hint. | lapse +1, short re-interval. Candidate for SOLO target one step lower. |
+| **Hard** | Partial; got it after one hint. | Same SOLO target, slightly longer interval. |
+| **Good** | Correct. | Same target, standard interval. |
+| **Easy** | Correct + unprompted connection or application. | Candidate for SOLO target one step higher. Long interval. |
 
-**SOLO 레벨 ↔ 질문 유형**:
+**SOLO ↔ question type**:
 
-| SOLO | 설명 | 질문 예 |
+| SOLO | Description | Example question |
 |---|---|---|
-| recall | 사실 회상 | "X 가 뭐야?" |
-| uni | 한 측면 | "X 의 주요 특성 하나는?" |
-| multi | 다중 측면 | "X 의 두 단계를 설명해" |
-| relational | 관계·구분·근거 | "X 와 Y 의 차이는? 왜 그렇게 설계됐어?" |
-| transfer | 응용 | "Z 라는 새 상황에서 X 를 어떻게 쓸까?" |
+| recall | factual recall | "What is X?" |
+| uni | one aspect | "Name one key property of X." |
+| multi | multiple aspects | "Describe the two stages of X." |
+| relational | relations, distinctions, rationale | "How does X differ from Y? Why is it designed that way?" |
+| transfer | application | "How would you use X in a new situation Z?" |
 
-카드의 `solo-target` 은 *최종* 도달점. 처음엔 recall 부터, grade 추이에 따라 target 까지 올림.
+A card's `solo-target` is the *final* depth to reach. Start at recall and climb toward the target as grades trend upward.
 
-**원칙**:
-- **먼저 묻고, 그 다음 설명한다.** 강의 금지.
-- **모르면 답을 바로 주기 전에 한 단계 힌트.** Self-correct 가 학습 효과 최고.
-- **정답 확인은 구체적으로**: "맞다" 가 아니라 "*ingest 시점에 합성한다* 라는 부분이 핵심".
-- **답변 길이는 짧게**. query 처럼 표·섹션 X. 한두 문장 + 한 질문.
-- **세션 중에 wiki 를 수정하지 않는다.** read-only. (스케줄러 호출은 deck 만 갱신, wiki/raw 는 안 건드림.)
-- **인터리빙 기본**. `instill <topic>` 으로 한정도 가능하지만 Bjork 연구는 혼합을 지지.
+**Principles**:
+- **Ask first, explain second.** Never lecture before the user attempts.
+- **If they don't know, give a hint before giving the answer.** Self-correction yields the strongest retention.
+- **Confirmations must be specific**: not "correct" but "*synthesizing at ingest time* — that's the key part you nailed."
+- **Keep replies short.** No tables or sectioned essays like in query. One or two sentences plus one question.
+- **The wiki is read-only during a session.** Scheduler calls only mutate `instill/_deck.json`; `wiki/` and `raw/` are untouched.
+- **Interleaving is the default.** Topic-scoped (`instill <topic>`) is allowed but Bjork supports mixing.
 
-**Backlog 폭주 대응**: due > 8 이면 스케줄러가 우선순위 정렬 (lapses → 가장 overdue → importance) 후 상위만 반환. 미진행 due 는 사라지지 않고 다음 세션으로 이월.
+**Backlog overflow**: if due > 8, the scheduler sorts by priority (lapses → most overdue → importance) and returns only the top. Untreated due cards do not disappear — they roll forward.
 
-**서사 메모 — `instill/<topic>.md`** (lazy-load):
+**Narrative notes — `instill/<topic>.md`** (lazy-load):
 
-FSRS 의 정량 상태(`_deck.json`) 와 별개로, 토픽별 코칭 노트는 `instill/<topic>.md` 에 마크다운으로. 마스터한 개념, 약점/강점 패턴, 세션 로그. 일반 세션에선 LLM 이 읽지 않음 — instill 시작 시에만.
+Separately from the quantitative state in `_deck.json`, per-topic coaching notes live in `instill/<topic>.md` as markdown: mastered concepts, weakness/strength patterns, session log. Normal sessions do NOT read these files — only instill sessions touching the topic do.
 
-**`wiki/log.md` 항목 형식**:
+**`wiki/log.md` entry format**:
 
 ```
-## [YYYY-MM-DD] instill | <혼합 | topic>
-- 카드: 8장 (due 6 / 신규 2). grade: 4G/2H/2A.
-- 다룬 토픽: cc-memory, cc-skills
-- 강점: ...
-- 약점: ...
-- 종료: 정상 / more / 사용자 stop
+## [YYYY-MM-DD] instill | <mixed | topic>
+- cards: 8 (due 6 / new 2). grades: 4G/2H/2A.
+- topics touched: cc-memory, cc-skills
+- strengths: ...
+- weaknesses: ...
+- end: normal / more / user-stop
 ```
-
-### 4.4 Lint — 정기 점검
-
-사용자가 "lint" 또는 "wiki 점검" 을 요청하면:
-
-- **모순 (contradictions)** — 같은 사실에 대해 두 페이지가 다르게 말하는 경우
-- **stale claims** — 새 소스로 갱신해야 할 오래된 주장
-- **orphan pages** — 어디서도 링크되지 않는 페이지
-- **missing pages** — 자주 언급되지만 자체 페이지가 없는 개념
-- **missing cross-refs** — 두 페이지가 분명히 관련 있는데 서로 링크가 없는 경우
-- **data gaps** — 웹 검색으로 채울 수 있는 빈틈
-
-결과는 `wiki/log.md` 에 `lint` 항목으로 기록하고, 자동으로 고칠 수 있는 것 (orphan 페이지에 백링크 추가 등) 은 바로 고친다. 판단이 필요한 것 (모순) 은 사용자에게 물어본다.
 
 ---
 
-## 5. index.md 형식
+## 5. `index.md` format
 
 ```markdown
 # Index
 
 ## Sources
-- [[sources/karpathy-llm-wiki]] — LLM이 wiki를 유지·확장하는 패턴 (2026-05-25)
+- [[sources/karpathy-llm-wiki]] — the LLM-wiki maintenance pattern (2026-05-25)
 
 ## Concepts
-- [[concepts/llm-wiki-pattern]] — RAG와 다른, 누적되는 지식 베이스
-- [[concepts/three-layer-architecture]] — raw / wiki / schema 세 층
+- [[concepts/llm-wiki-pattern]] — accumulating KB unlike RAG
+- [[concepts/three-layer-architecture]] — raw / wiki / schema
 
 ## Entities
-- [[entities/obsidian]] — markdown 기반 PKM 도구
-- [[entities/qmd]] — 로컬 markdown 검색 엔진
+- [[entities/obsidian]] — markdown-based PKM
+- [[entities/qmd]] — local markdown search engine
 ```
 
-카테고리별로 묶고, 각 항목은 한 줄. wiki가 커지면 카테고리 내부에서 알파벳·주제·날짜순 정렬을 도입할 수 있다.
+Group by category; one line per item. Once the wiki grows, introduce alphabetical / topical / date ordering within categories.
 
 ---
 
-## 6. log.md 형식
+## 6. `log.md` format
 
-append-only. 항상 가장 최근 항목이 **위**가 아니라 **아래**에 오도록 한다 (시간순). 각 항목은 `## [YYYY-MM-DD] <op> | <한줄>` 헤더로 시작한다 — 이러면 `grep "^## \[" log.md | tail -10` 식으로 최근 활동을 뽑을 수 있다.
+Append-only. The newest entry is at the **bottom**, not the top (chronological). Each entry starts with `## [YYYY-MM-DD] <op> | <one-liner>` so recent activity can be pulled with `grep "^## \[" log.md | tail -10`.
 
 ```markdown
 ## [2026-05-25] ingest | Karpathy — LLM Wiki
 - raw: raw/karpathy-llm-wiki.md
-- 신규: [[sources/karpathy-llm-wiki]], [[concepts/llm-wiki-pattern]], [[concepts/three-layer-architecture]], [[entities/obsidian]]
-- 갱신: [[index]]
+- new: [[sources/karpathy-llm-wiki]], [[concepts/llm-wiki-pattern]], [[concepts/three-layer-architecture]], [[entities/obsidian]]
+- new cards: 7
+- updated: [[index]]
 
-## [2026-05-26] query | RAG vs wiki, 핵심 차이?
-- 참조: [[concepts/llm-wiki-pattern]], [[sources/karpathy-llm-wiki]]
-- 결과: [[concepts/rag-vs-wiki]] 신규
+## [2026-05-26] query | RAG vs wiki, key difference?
+- referenced: [[concepts/llm-wiki-pattern]], [[sources/karpathy-llm-wiki]]
+- result: new [[concepts/rag-vs-wiki]]
 
 ## [2026-05-30] lint
-- orphan 2: [[entities/marp]], [[entities/dataview]] → index에 추가
-- contradiction 0
+- orphans 2: [[entities/marp]], [[entities/dataview]] → added to index
+- contradictions 0
 
-## [2026-06-01] instill | RAG vs LLM Wiki
-- 다룬 페이지: [[concepts/rag-vs-wiki]], [[concepts/llm-wiki-pattern]]
-- 강점: 합성 시점 구분 이해
-- 약점: 모순 검출 메커니즘 (lint)
-- 보강: 반례 + 직접 설명 + 재질문
-- 종료: 마스터
+## [2026-06-01] instill | mixed
+- cards: 8 (due 6 / new 2). grades: 5G/2H/1A.
+- topics touched: rag-vs-wiki, llm-wiki-pattern
+- strengths: distinguishes synthesis timing
+- weaknesses: contradiction detection mechanism
+- end: normal
 ```
 
 ---
 
-## 7. 운영 원칙
+## 7. Operating principles
 
-1. **raw/는 절대 수정·삭제하지 않는다.** 출처 무결성. 잘못 클리핑된 경우엔 새 파일로 추가하고 기존 것은 `raw/_deprecated/` 로 옮긴다.
-2. **wiki/ 페이지에는 모두 출처가 있어야 한다.** 출처 없는 주장은 `> ❓ 출처 미확인` 로 표시.
-3. **변경할 때마다 index.md와 log.md를 함께 업데이트한다.** 빼먹으면 wiki가 빠르게 망가진다.
-4. **링크는 적극적으로.** 두 페이지가 관련 있어 보이면 양방향 링크. 백링크가 wiki의 가치.
-5. **요약은 짧게, 본문은 충실하게.** 한 줄 요약은 사용자가 index 에서 훑을 때 1초 안에 의미가 잡혀야 한다.
-6. **추측 금지.** raw 소스에 없는 내용은 추가하지 않는다. 외부 지식이 필요하면 `web search 필요` 로 표시하고 사용자에게 알린다.
-
----
-
-## 8. 사용자가 자주 쓸 명령
-
-자연어 — 별도 슬래시 명령 없음.
-
-- `raw/X.md ingest 해줘` — ingest 워크플로우 실행 (자동 카드 추출 포함)
-- `Q에 대해 wiki에 뭐가 있어?` 또는 `Q 답해줘` — query 워크플로우
-- `instill` — 모든 토픽 혼합 deck 으로 instill 세션 시작 (기본, 인터리빙)
-- `instill <주제>` — 토픽 한정 세션
-- `more` — 8장 끝났을 때 4장 추가
-- `stop` / `그만` / `종료` — 진행 중인 instill 세션 종료
-- `wiki 점검해줘` 또는 `lint` — lint 워크플로우
-- `index 보여줘` — `wiki/index.md` 출력
-- `최근 활동` — `wiki/log.md` 마지막 N개 항목 출력
+1. **`raw/` is immutable.** Never edit or delete. If a clipping is wrong, add a new file and move the old one to `raw/_deprecated/`.
+2. **Every wiki claim needs a source.** Mark unsourced claims `> ❓ source unverified`.
+3. **Update `index.md` and `log.md` on every wiki mutation.** Skipping these decays the wiki quickly.
+4. **Link aggressively.** If two pages seem related, link both ways. Backlinks are the wiki's value.
+5. **Short summaries, thorough bodies.** A one-line summary in `index.md` must register meaning within one second of scanning.
+6. **No fabrication.** Do not add anything absent from raw sources. If external knowledge is required, flag `web search needed` and ask the user.
 
 ---
 
-## 9. 향후 확장 (현재는 도입하지 않음)
+## 8. Common user commands
 
-- **검색 엔진**: 페이지가 ~100개를 넘어가면 [[entities/qmd]] 같은 로컬 검색 도구 도입 검토.
-- **Dataview 쿼리**: frontmatter 기반 동적 표·목록.
-- **자동 백링크**: 모든 페이지 하단에 inbound link 목록 자동 생성.
-- **git 통합**: ingest/lint 마다 자동 commit.
+Natural language — no slash commands.
 
-도입할 때 이 파일에 섹션을 추가한다.
+- `raw/X.md ingest 해줘` — run ingest (auto card extraction included)
+- `Q 답해줘` / `Q에 대해 wiki에 뭐가 있어?` — run query
+- `instill` — start instill session with the mixed deck (default, interleaved)
+- `instill <주제>` — topic-scoped instill session
+- `more` — extend the current session by 4 cards
+- `stop` / `그만` / `종료` — end the current instill session
+- `lint` / `wiki 점검해줘` — run lint
+- `index 보여줘` — print `wiki/index.md`
+- `최근 활동` — print the last N entries of `wiki/log.md`
+
+---
+
+## 9. Future extensions (not yet adopted)
+
+- **Search engine**: if pages exceed ~100, consider a local markdown search tool such as [[entities/qmd]].
+- **Dataview-style queries**: dynamic tables/lists from frontmatter.
+- **Automatic backlinks**: render inbound link lists at the bottom of every page.
+- **Git integration**: auto-commit on each ingest / lint.
+
+Add a section here when one is adopted.
