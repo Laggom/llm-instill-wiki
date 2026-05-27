@@ -19,7 +19,9 @@ This file is the **schema** for this wiki. It defines the structure, format, and
 
 ```
 .
-├── CLAUDE.md          # this file — schema / operating rules
+├── CLAUDE.md          # this file — schema / operating rules (source of truth)
+├── AGENTS.md          # pointer → CLAUDE.md (auto-loaded by Cursor / Codex)
+├── GEMINI.md          # pointer → CLAUDE.md (auto-loaded by Gemini CLI)
 ├── README.md          # human-facing intro + agent installation guide
 ├── tools/
 │   └── instill_sched.py   # FSRS-4.5 scheduler (stdlib only)

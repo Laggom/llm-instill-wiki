@@ -63,22 +63,9 @@ ingest, query, lint 는 흔합니다. instill 이 다른 점이에요.
 
 기본적으로 **[Claude Code](https://docs.anthropic.com/en/docs/claude-code)** 에서 동작하도록 만들어졌습니다. Claude Code 는 프로젝트 루트의 `CLAUDE.md` 를 매 세션 시작 시 자동으로 컨텍스트에 주입해주는데, 이 schema 가 그 동작에 기대고 있어요.
 
-다른 코딩 CLI 에서도 쓰실 수 있습니다. 다만 약간의 손이 필요해요.
+다른 코딩 CLI 에서도 **별도 설정 없이** 그대로 동작합니다. repo 에 `AGENTS.md` (Cursor / Codex 용) 와 `GEMINI.md` (Gemini CLI 용) 가 미리 들어있고, 각 파일은 "CLAUDE.md 를 읽어라" 라는 짧은 포인터입니다. agent 가 자동으로 따라옵니다.
 
-`CLAUDE.md` 를 source 로 두고, 도구가 기대하는 파일명으로 **그냥 복사** 하시면 됩니다.
-
-- **Cursor / Codex / 기타 AGENTS.md 호환 도구** → `AGENTS.md` 로 복사
-- **Gemini CLI** → `GEMINI.md` 로 복사
-- **기타 환경 (자동 컨텍스트 로드 없음)** → 매 세션 시작 시 `CLAUDE.md` 내용을 시스템 프롬프트에 직접 붙여 넣기
-
-```bash
-# macOS / Linux / Windows 어디서나
-cp CLAUDE.md AGENTS.md     # 또는 GEMINI.md
-```
-
-심볼릭 링크는 권장하지 않습니다. Windows 에선 개발자 모드/관리자 권한이 필요하고, Dropbox·OneDrive 같은 클라우드 동기화에서 깨지고, git clone 시 OS 간 호환성 문제가 생길 수 있습니다. 그냥 복사가 안전합니다.
-
-복사를 쓰시면 schema 를 손볼 때마다 다시 복사해야 한다는 작은 부담이 있지만, schema 자체는 자주 바뀌지 않으니 실제로는 거의 신경 안 쓰셔도 됩니다.
+자동 컨텍스트 로드가 없는 환경 (일반 웹 챗 등) 에선 매 세션 시작 시 `CLAUDE.md` 내용을 시스템 프롬프트에 직접 붙여 넣으셔야 합니다.
 
 `tools/instill_sched.py` 는 **Python 3.10+** 필요합니다. 표준 라이브러리만 쓰니까 별도 패키지 설치는 없어요.
 
@@ -141,24 +128,18 @@ mkdir -p raw wiki instill
 mkdir -p wiki/sources wiki/concepts wiki/entities
 ```
 
-**3. Wire the schema file to whatever filename your host tool auto-loads.**
+**3. Schema wiring (already handled).**
 
-| Host tool | Expected filename | Action |
+`AGENTS.md` and `GEMINI.md` already exist in the repo as one-line pointer files that redirect the agent to `CLAUDE.md`. No action needed for any of the supported host tools:
+
+| Host tool | Auto-loaded file | Behavior |
 |---|---|---|
-| Claude Code | `CLAUDE.md` | already correct — no action |
-| Cursor, Codex, generic AGENTS.md | `AGENTS.md` | copy `CLAUDE.md` → `AGENTS.md` |
-| Gemini CLI | `GEMINI.md` | copy `CLAUDE.md` → `GEMINI.md` |
-| Other / unknown | n/a | tell user to paste `CLAUDE.md` contents into their system prompt each session |
+| Claude Code | `CLAUDE.md` | reads schema directly |
+| Cursor, Codex, AGENTS.md-compatible | `AGENTS.md` | reads pointer → follows link to `CLAUDE.md` |
+| Gemini CLI | `GEMINI.md` | reads pointer → follows link to `CLAUDE.md` |
+| Other / no auto-load | n/a | tell user to paste `CLAUDE.md` contents into their system prompt each session |
 
-Use a plain copy, not a symlink:
-
-```bash
-cp CLAUDE.md AGENTS.md     # or GEMINI.md
-```
-
-Symlinks are not recommended. On Windows they require Developer Mode or admin rights, break under cloud-sync clients (Dropbox/OneDrive/iCloud), and behave inconsistently across `git clone` between OSes. Copy is portable.
-
-Warn the user that future edits to `CLAUDE.md` must be propagated to the copied file. The schema rarely changes, so this is light overhead in practice.
+`CLAUDE.md` is the single source of truth. Never edit `AGENTS.md` or `GEMINI.md` — they are intentionally minimal pointers.
 
 **4. Initialize empty wiki scaffolding** so subsequent workflows have files to update:
 
@@ -257,7 +238,7 @@ IDs must be wiki-globally unique. The scheduler keys off `id` only — it does n
 
 ## Cross-tool compatibility
 
-`CLAUDE.md` is the canonical schema file. For agents on other platforms, the user may have symlinked or copied it to `AGENTS.md` (Cursor/Codex) or `GEMINI.md` (Gemini CLI). Treat any of those names as equivalent — they point to the same content.
+`CLAUDE.md` is the canonical schema file. Sibling files `AGENTS.md` (Cursor/Codex) and `GEMINI.md` (Gemini CLI) exist as minimal pointers that redirect agents to `CLAUDE.md`. If your host tool auto-loaded one of those pointers, follow the link and read `CLAUDE.md` — that is your schema.
 
 ## Commands the user may type
 
