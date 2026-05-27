@@ -107,7 +107,16 @@ Both Obsidian-style `[[wiki/path/page]]` and plain markdown `[text](path)` are a
 
 ### 4.1 Ingest — adding a new source
 
-1. The user drops a file into `raw/<slug>.md` (or PDF, etc.).
+**raw/ stores markdown only.** Non-markdown sources (PDF, HTML, EPUB, etc.) must be converted to markdown before they live in `raw/`. The repo intentionally has no Python conversion dependency.
+
+When the user hands you a non-markdown source, follow this fallback chain:
+
+1. **If your host tool can natively read the format** (Claude Code reads PDFs natively; recent Cursor also does), read it directly and write the markdown into `raw/<slug>.md` yourself. Then proceed with the normal ingest steps below.
+2. **If your host tool cannot read the format**, do NOT pip-install anything. Stop and tell the user: "I can't read this file type in this environment. Please convert it to markdown first (e.g., with `pandoc`, `markitdown`, or any web converter) and place it as `raw/<slug>.md`, then ask me again." Resume ingest only after the markdown is in place.
+
+Steps:
+
+1. The user drops (or you create from a converted source) a file at `raw/<slug>.md`.
 2. The LLM opens the raw file **read-only** and extracts the key content.
 3. Create `wiki/sources/<slug>.md` with summary, key claims, and quotable lines.
 4. For each concept, person, or tool mentioned, create or update a page under `wiki/concepts/` or `wiki/entities/`.
