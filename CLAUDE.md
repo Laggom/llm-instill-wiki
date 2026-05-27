@@ -158,7 +158,7 @@ Record findings in `wiki/log.md` under a `lint` entry. Auto-fix the mechanical i
    - Pick a question type matching the card's current SOLO level (see table below).
    - User answers. Keep the LLM side short — one card = one question's worth of exchange.
    - LLM assigns a grade, then calls `python tools/instill_sched.py review --id X --grade {again,hard,good,easy}`.
-5. **After 8 cards**: ask "more?". If `more`, add 4 more. Otherwise end.
+5. **After 8 cards**: ask whether to continue. If the user signals "keep going" (any natural phrasing — "더 해줘", "조금 더", "more", etc.), add 4 more cards. Otherwise end.
 6. **Session end**: update `instill/<topic>.md` for each touched topic with narrative notes (mastered, in-progress, weaknesses, strengths). Append one line to `wiki/log.md`.
 
 **Grade rubric**:
@@ -204,7 +204,7 @@ Separately from the quantitative state in `_deck.json`, per-topic coaching notes
 - topics touched: cc-memory, cc-skills
 - strengths: ...
 - weaknesses: ...
-- end: normal / more / user-stop
+- end: completed-deck / extended / user-stopped
 ```
 
 ---
@@ -254,7 +254,7 @@ Append-only. The newest entry is at the **bottom**, not the top (chronological).
 - topics touched: rag-vs-wiki, llm-wiki-pattern
 - strengths: distinguishes synthesis timing
 - weaknesses: contradiction detection mechanism
-- end: normal
+- end: completed-deck
 ```
 
 ---
@@ -278,8 +278,7 @@ Natural language — no slash commands.
 - `Q 답해줘` / `Q에 대해 wiki에 뭐가 있어?` — run query
 - `instill` — start instill session with the mixed deck (default, interleaved)
 - `instill <주제>` — topic-scoped instill session
-- `more` — extend the current session by 4 cards
-- `stop` / `그만` / `종료` — end the current instill session
+- Continue / stop signals during a session are recognized from natural phrasing — no fixed keyword. "더 해줘", "more", "충분해", "그만", "stop" all work. Interpret intent, not literal tokens.
 - `lint` / `wiki 점검해줘` — run lint
 - `index 보여줘` — print `wiki/index.md`
 - `최근 활동` — print the last N entries of `wiki/log.md`

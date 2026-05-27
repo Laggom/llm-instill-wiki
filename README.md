@@ -40,7 +40,7 @@ ingest, query, lint 는 흔합니다. instill 이 다른 점이에요.
 2. 신규 후보 중 빼고 싶은 게 있으면 사용자가 drop 합니다.
 3. 최대 8장 (≈5분) 진행합니다. 카드마다 LLM 이 한 줄짜리 질문을 던지고, 사용자가 답하고, LLM 이 Again/Hard/Good/Easy 로 평가합니다.
 4. 평가 결과에 따라 다음 복습 시점이 자동으로 계산됩니다.
-5. 끝나고 더 하고 싶으면 `more`, 그만하려면 `stop`.
+5. 끝나고 더 하고 싶으면 "더 해줘", 그만하려면 "그만". 그냥 자연어로 말씀하시면 됩니다.
 
 5분이 한도라고 정한 건, 그 이상은 어차피 잘 안 한다는 게 정직한 가정이라서요.
 
@@ -264,8 +264,8 @@ IDs must be wiki-globally unique. The scheduler keys off `id` only — it does n
 | `Q 답해줘` / `Q에 대해 wiki에 뭐가 있어?` | run query workflow |
 | `instill` | start mixed-deck instill session (interleaved across topics) |
 | `instill <topic>` | start topic-scoped instill session |
-| `more` | extend current session by 4 cards |
-| `stop` / `그만` / `종료` | end instill session, update narrative notes + `wiki/log.md` |
+| natural "continue" signal during session | extend current session by 4 cards |
+| natural "stop" signal during session | end instill session, update narrative notes + `wiki/log.md` |
 | `lint` / `wiki 점검해줘` | run lint workflow |
 
 </details>
