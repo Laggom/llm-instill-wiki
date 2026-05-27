@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""instill scheduler — FSRS-4.5 inspired card scheduling.
+"""instill scheduler — FSRS-5 card scheduling.
 
 Usage:
   python tools/instill_sched.py today [--topic TOPIC] [--limit 8] [--new-limit 3]
@@ -22,8 +22,10 @@ Deck state lives in instill/_deck.json. Schema:
     }
   }
 
-FSRS parameters are the published FSRS-4.5 defaults. Accurate enough for
-personal-scale instill; swap to `pip install fsrs` if higher fidelity needed.
+Implements FSRS-5 with the published default 19 weights. Short-term review
+within a single day (W[17], W[18]) is not modeled — instill sessions assume
+one review per card per day, which matches the personal-scale use case.
+For higher fidelity (e.g., training custom weights), swap to `pip install fsrs`.
 """
 from __future__ import annotations
 
@@ -37,35 +39,44 @@ from pathlib import Path
 
 DECK_PATH = Path(__file__).resolve().parent.parent / "instill" / "_deck.json"
 
-# FSRS-4.5 default weights (17 parameters)
-W = [0.4, 0.6, 2.4, 5.8, 4.93, 0.94, 0.86, 0.01,
-     1.49, 0.14, 0.94, 2.18, 0.05, 0.34, 1.26, 0.29, 2.61]
+# FSRS-5 default weights (19 parameters)
+W = [
+    0.4072, 1.1829, 3.1262, 15.4722,
+    7.2102, 0.5316, 1.0651, 0.0234,
+    1.616, 0.1544, 1.0824, 1.9813,
+    0.0953, 0.2975, 2.2042, 0.2407,
+    2.9466, 0.5034, 0.6567,
+]
+DECAY = -0.5
+FACTOR = 19 / 81  # ensures retrievability = 0.9 when elapsed = stability
 
 GRADE = {"again": 1, "hard": 2, "good": 3, "easy": 4}
 
 
-# ---------- FSRS core ----------
+# ---------- FSRS-5 core ----------
 
 def init_stability(rating: int) -> float:
     return max(W[rating - 1], 0.1)
 
 def init_difficulty(rating: int) -> float:
-    return _clip(W[4] - (rating - 3) * W[5], 1, 10)
+    # FSRS-5: D₀(G) = W[4] - e^(W[5] * (G-1)) + 1
+    return _clip(W[4] - math.exp(W[5] * (rating - 1)) + 1, 1, 10)
 
 def retrievability(elapsed_days: float, stability: float) -> float:
+    # FSRS-5: R(t, S) = (1 + FACTOR * t/S)^DECAY
     if stability <= 0:
         return 0.0
-    return (1 + elapsed_days / (9 * stability)) ** -1
+    return (1 + FACTOR * elapsed_days / stability) ** DECAY
 
 def next_difficulty(d: float, rating: int) -> float:
+    # Linear damping + mean reversion toward init_difficulty(rating=4) baseline.
     delta = -W[6] * (rating - 3)
-    d_new = d + delta * ((10 - d) / 9)
-    # mean reversion toward init_difficulty(rating=4) ("easy" baseline)
-    d_new = W[7] * init_difficulty(4) + (1 - W[7]) * d_new
+    d_after = d + delta * ((10 - d) / 9)
+    d_new = W[7] * init_difficulty(4) + (1 - W[7]) * d_after
     return _clip(d_new, 1, 10)
 
 def next_stability(d: float, s: float, r: float, rating: int) -> float:
-    if rating == 1:  # Again — forget
+    if rating == 1:  # Again — lapse
         return W[11] * (d ** -W[12]) * ((s + 1) ** W[13] - 1) * math.exp(W[14] * (1 - r))
     hard_penalty = W[15] if rating == 2 else 1.0
     easy_bonus = W[16] if rating == 4 else 1.0
@@ -73,8 +84,8 @@ def next_stability(d: float, s: float, r: float, rating: int) -> float:
                 * (math.exp(W[10] * (1 - r)) - 1) * hard_penalty * easy_bonus)
 
 def next_interval(stability: float, request_retention: float) -> int:
-    # Solve r = (1 + t/(9s))^-1 for t with r=request_retention.
-    days = 9 * stability * (1 / request_retention - 1)
+    # FSRS-5: I(r, S) = (S/FACTOR) * (r^(1/DECAY) - 1)
+    days = (stability / FACTOR) * (request_retention ** (1 / DECAY) - 1)
     return max(1, min(int(round(days)), 365))
 
 def _clip(x: float, lo: float, hi: float) -> float:

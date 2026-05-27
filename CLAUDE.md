@@ -1,6 +1,6 @@
 # CLAUDE.md — LLM Wiki Operating Schema
 
-This file is the **schema** for this wiki. It defines the structure, format, and workflows the LLM must follow when maintaining and extending the wiki. Based on Karpathy's [LLM Wiki pattern](https://gist.github.com/karpathy).
+This file is the **schema** for this wiki. It defines the structure, format, and workflows the LLM must follow when maintaining and extending the wiki. Based on Karpathy's [LLM Wiki pattern](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f).
 
 > Principle: the human curates, asks, and sets direction. The LLM writes and maintains the entire wiki.
 
@@ -26,7 +26,7 @@ This file is the **schema** for this wiki. It defines the structure, format, and
 ├── install.sh         # setup script (macOS / Linux / WSL)
 ├── install.ps1        # setup script (Windows PowerShell)
 ├── tools/
-│   └── instill_sched.py   # FSRS-4.5 scheduler (stdlib only)
+│   └── instill_sched.py   # FSRS-5 scheduler (stdlib only)
 ├── raw/               # source clippings (IMMUTABLE — never edit or delete)
 │   ├── *.md           # articles, papers, notes
 │   └── assets/        # images / attachments (create if needed)
@@ -148,6 +148,7 @@ Triggered by `lint` or `wiki 점검해줘`. Detect:
 - **Missing pages** — concepts mentioned repeatedly without a dedicated page.
 - **Missing cross-refs** — two pages clearly related but with no link between them.
 - **Data gaps** — holes that a web search could fill.
+- **Orphan instill cards** — card IDs in `instill/_deck.json` whose corresponding `claim` no longer exists in any wiki page's frontmatter (e.g., the page was deleted or the `instill:` entry was removed). Report each and ask the user whether to `skip` them via the scheduler.
 
 Record findings in `wiki/log.md` under a `lint` entry. Auto-fix the mechanical issues (e.g., add a backlink for an orphan). Surface judgment calls (contradictions) to the user.
 
@@ -159,7 +160,7 @@ Record findings in `wiki/log.md` under a `lint` entry. Auto-fix the mechanical i
 
 **Foundations (learning science)**:
 - **Testing effect** — retrieval beats re-reading (Roediger & Karpicke 2006).
-- **Spacing effect** — spaced practice retains more than massed (Cepeda et al. 2008). Scheduling uses **FSRS-4.5** (the algorithm Anki adopted in 2024).
+- **Spacing effect** — spaced practice retains more than massed (Cepeda et al. 2008). Scheduling uses **FSRS-5** (the algorithm family Anki adopted in 2024+).
 - **Desirable difficulties** — interleave topics; aim for a small failure rate (Bjork).
 - **Mastery learning** — one correct retrieval ≠ mastered. Multiple successes across spaced sessions are required.
 - **SOLO taxonomy** — five levels of depth: recall / uni / multi / relational / transfer (Biggs).
@@ -171,8 +172,9 @@ Record findings in `wiki/log.md` under a `lint` entry. Auto-fix the mechanical i
 1. **Pull today's queue**: `python tools/instill_sched.py today [--topic X] --limit 8 --new-limit 3`. Receives JSON with `due` and `new_candidates`.
 2. **New-card drop step**: if `new_candidates` is non-empty, show the list to the user and ask "any you'd like to skip?". For each dropped card, call `python tools/instill_sched.py skip --id X`.
 3. **Begin the session**: up to 8 cards (due + new ≤ 3). Interleave the order.
-4. **Per card**:
-   - Pick a question type matching the card's current SOLO level (see table below).
+4. **Per card** (the scheduler returns `id` only — text lives in the wiki):
+   - **Look up the card's `claim`** by `id` in the corresponding wiki page's frontmatter `instill:` array. Read the `solo-target` too.
+   - Pick a question type appropriate for this card (see SOLO table below).
    - User answers. Keep the LLM side short — one card = one question's worth of exchange.
    - LLM assigns a grade, then calls `python tools/instill_sched.py review --id X --grade {again,hard,good,easy}`.
 5. **After 8 cards**: ask whether to continue. If the user signals "keep going" (any natural phrasing — "더 해줘", "조금 더", "more", etc.), add 4 more cards. Otherwise end.
@@ -249,7 +251,7 @@ Group by category; one line per item. Once the wiki grows, introduce alphabetica
 
 ## 6. `log.md` format
 
-Append-only. The newest entry is at the **bottom**, not the top (chronological). Each entry starts with `## [YYYY-MM-DD] <op> | <one-liner>` so recent activity can be pulled with `grep "^## \[" log.md | tail -10`.
+Append-only. The newest entry is at the **bottom**, not the top (chronological). Each entry starts with `## [YYYY-MM-DD] <op> | <one-liner>` so recent activity can be pulled with `grep "^## \[" log.md | tail -10` (Unix) or `Select-String "^## \[" log.md | Select-Object -Last 10` (PowerShell).
 
 ```markdown
 ## [2026-05-25] ingest | Karpathy — LLM Wiki
@@ -327,6 +329,7 @@ Natural language — no slash commands.
 - `lint` / `wiki 점검해줘` — run lint
 - `index 보여줘` — print `wiki/index.md`
 - `최근 활동` — print the last N entries of `wiki/log.md`
+- `상태` / `progress` / `stats` — run `python tools/instill_sched.py stats` and report deck size, by-state breakdown, due-today count, average stability
 
 ---
 
