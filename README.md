@@ -106,3 +106,101 @@ mkdir raw wiki instill
 - 원본 영감: [Karpathy 의 LLM Wiki gist](https://gist.github.com/karpathy)
 
 질문·제안 있으시면 issue 로 남겨주세요.
+
+---
+
+<details>
+<summary><b>For LLM agents</b> (click to expand)</summary>
+
+This section is written for coding agents that land in this repo. It mirrors what a human reader gets above, condensed for machine consumption.
+
+## What this repo is
+
+A Claude Code operational schema implementing an LLM-maintained personal wiki layered with an active-recall learning loop. The schema itself is the deliverable; user content (`raw/`, `wiki/`, `instill/`, `chats/`) is gitignored.
+
+## Source of truth
+
+- **`CLAUDE.md`** — the operative schema. Read it first. Defines four workflows: ingest, query, instill, lint. Sections §1–§9 specify directory layout, page format, naming, workflows, principles, and user commands.
+- **`docs/specs/2026-05-27-instill-v2-design.md`** — design rationale for the instill v2 loop (FSRS scheduling, SOLO depth ladder, card decomposition, 5-min session budget). Read when modifying instill logic.
+
+If `CLAUDE.md` and this README disagree, `CLAUDE.md` wins.
+
+## Three modes
+
+| Mode | Who answers | Output |
+|---|---|---|
+| ingest | LLM | raw source → wiki pages + extracted cards enrolled in scheduler |
+| query | LLM | synthesized answer from wiki, optionally promoted back to a new wiki page |
+| instill | **user** | retrieval practice with FSRS-scheduled cards; LLM grades, never lectures first |
+
+## Layout
+
+```
+CLAUDE.md                       schema (operative rules)
+README.md                       human + this agent guide
+tools/instill_sched.py          FSRS-4.5 scheduler (stdlib only, CLI)
+docs/specs/                     design docs
+raw/        (gitignored)        immutable source clippings
+wiki/       (gitignored)        LLM-maintained pages: sources/, concepts/, entities/, index.md, log.md
+instill/    (gitignored)        _deck.json (FSRS state) + per-topic narrative notes
+```
+
+## Scheduler CLI
+
+```
+python tools/instill_sched.py today [--topic T] [--limit 8] [--new-limit 3]
+python tools/instill_sched.py review --id ID --grade {again,hard,good,easy}
+python tools/instill_sched.py enroll --id ID [--importance high|med|low] [--topic T]
+python tools/instill_sched.py skip --id ID
+python tools/instill_sched.py stats
+```
+
+Never compute FSRS state in-context. Always shell out to this script. Deck state is at `instill/_deck.json`.
+
+## Card model
+
+Cards live in the wiki page frontmatter:
+
+```yaml
+instill:
+  - id: cc-mem-001              # globally unique
+    claim: "single-line testable assertion"
+    importance: high|med|low
+    solo-target: recall|uni|multi|relational|transfer
+    skip: false
+```
+
+IDs must be wiki-globally unique. The scheduler keys off `id` only — it does not parse wiki frontmatter; ingest must call `enroll` explicitly.
+
+## Workflow contract
+
+- **ingest** must (1) read raw, (2) produce/update wiki pages, (3) extract `instill:` cards into frontmatter, (4) call `enroll` per new card, (5) update `wiki/index.md` and `wiki/log.md`. No user approval gate at ingest.
+- **query** reads `wiki/index.md` first. Cites every claim with `[[wiki-path]]`. Promote reusable synthesis back to a new concept page.
+- **instill** is read-only on `wiki/` and `raw/`. The scheduler may write `instill/_deck.json` and the LLM may write narrative notes to `instill/<topic>.md`. Session budget: ≤ 8 cards, ≤ 3 new cards.
+- **lint** detects contradictions, stale claims, orphan pages, missing cross-refs, data gaps. Auto-fix mechanical issues; ask the user about judgment calls.
+
+## Hard constraints
+
+- `raw/` is immutable. Never edit or delete files there. If a clipping is wrong, add a new file and move the old one to `raw/_deprecated/`.
+- Every wiki claim needs a source. Unsourced claims must be marked `> ❓ 출처 미확인`.
+- Update `wiki/index.md` and `wiki/log.md` on every wiki mutation.
+- Korean polite speech (존댓말) is required in user-facing responses per the user's global preference.
+
+## Cross-tool compatibility
+
+`CLAUDE.md` is the canonical schema file. For agents on other platforms, the user may have symlinked or copied it to `AGENTS.md` (Cursor/Codex) or `GEMINI.md` (Gemini CLI). Treat any of those names as equivalent — they point to the same content.
+
+## Commands the user may type
+
+| Input | Action |
+|---|---|
+| `raw/X.md ingest 해줘` | run ingest workflow including auto card extraction |
+| `Q 답해줘` / `Q에 대해 wiki에 뭐가 있어?` | run query workflow |
+| `instill` | start mixed-deck instill session (interleaved across topics) |
+| `instill <topic>` | start topic-scoped instill session |
+| `more` | extend current session by 4 cards |
+| `stop` / `그만` / `종료` | end instill session, update narrative notes + `wiki/log.md` |
+| `lint` / `wiki 점검해줘` | run lint workflow |
+
+</details>
+
