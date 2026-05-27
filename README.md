@@ -30,7 +30,7 @@ ingest, query, lint 는 흔합니다. instill 이 다른 점이에요.
 - **Desirable difficulties** (Bjork) — 너무 쉬우면 학습이 안 됩니다. 약간 실패할 정도가 적정. 토픽을 섞어 인터리빙으로 진행합니다.
 - **SOLO taxonomy** (Biggs) — 이해의 깊이를 5단계로 나눠 (단순 회상 → 응용·전이), 카드가 익숙해질수록 더 깊은 질문을 던집니다.
 
-스케줄링 알고리즘은 **FSRS-4.5** 를 씁니다. Anki 가 2024 부터 기본으로 채택한 최신 알고리즘이에요. 직접 LLM 이 계산하면 오차가 생길 수 있어서 `tools/instill_sched.py` 라는 작은 스크립트로 분리했습니다. Python 표준 라이브러리만 쓰니까 추가 설치는 필요 없습니다.
+스케줄링 알고리즘은 **FSRS-4.5** 를 씁니다. Anki 가 2024 부터 기본으로 채택한 최신 알고리즘이에요. 직접 LLM 이 계산하면 오차가 생길 수 있어서 `tools/instill_sched.py` 라는 작은 스크립트로 분리했습니다. 스케줄러 자체는 Python 표준 라이브러리만 쓰니까 별도 패키지가 필요 없어요 (PDF 변환 같은 다른 작업이 패키지를 요구하면 agent 가 첫 번째에 한 번 물어보고 설치합니다).
 
 ## 한 세션은 어떻게 흘러가나요
 
@@ -67,7 +67,7 @@ ingest, query, lint 는 흔합니다. instill 이 다른 점이에요.
 
 자동 컨텍스트 로드가 없는 환경 (일반 웹 챗 등) 에선 매 세션 시작 시 `CLAUDE.md` 내용을 시스템 프롬프트에 직접 붙여 넣으셔야 합니다.
 
-`tools/instill_sched.py` 는 **Python 3.10+** 필요합니다. 표준 라이브러리만 쓰니까 별도 패키지 설치는 없어요.
+`tools/instill_sched.py` 는 **Python 3.10+** 필요합니다. 스케줄러 자체는 표준 라이브러리만 쓰고, 다른 워크플로우 (예: PDF 변환) 가 외부 패키지를 요구하면 agent 가 첫 사용 시점에 venv 격리 여부를 한 번 묻고 진행합니다.
 
 ## 시작하는 법
 
@@ -121,7 +121,7 @@ This section is written for coding agents that land in this repo. It mirrors wha
 
 ## What this repo is
 
-A Claude Code operational schema implementing an LLM-maintained personal wiki layered with an active-recall learning loop. The schema itself is the deliverable; user content (`raw/`, `wiki/`, `instill/`, `chats/`) is gitignored.
+A Claude Code operational schema implementing an LLM-maintained personal wiki layered with an active-recall learning loop. The schema itself is the deliverable; user content (`raw/`, `wiki/`, `instill/`) is gitignored.
 
 ## Installation (run this when the user clones the repo)
 
@@ -227,17 +227,13 @@ IDs must be wiki-globally unique. The scheduler keys off `id` only — it does n
 - `raw/` is immutable. Never edit or delete files there. If a clipping is wrong, add a new file and move the old one to `raw/_deprecated/`.
 - Every wiki claim needs a source. Unsourced claims must be marked `> ❓ 출처 미확인`.
 - Update `wiki/index.md` and `wiki/log.md` on every wiki mutation.
-- Korean polite speech (존댓말) is required in user-facing responses per the user's global preference.
-
-## Cross-tool compatibility
-
-`CLAUDE.md` is the canonical schema file. Sibling files `AGENTS.md` (Cursor/Codex) and `GEMINI.md` (Gemini CLI) exist as minimal pointers that redirect agents to `CLAUDE.md`. If your host tool auto-loaded one of those pointers, follow the link and read `CLAUDE.md` — that is your schema.
+- Korean polite speech (존댓말) is the required output language for user-facing responses (see CLAUDE.md §0).
 
 ## Commands the user may type
 
 | Input | Action |
 |---|---|
-| `raw/X.md ingest 해줘` | run ingest workflow including auto card extraction |
+| `<path> ingest 해줘` | run ingest on the file at `<path>` (any location, any supported format); agent normalizes to `raw/<slug>.md` then runs the workflow including auto card extraction |
 | `Q 답해줘` / `Q에 대해 wiki에 뭐가 있어?` | run query workflow |
 | `instill` | start mixed-deck instill session (interleaved across topics) |
 | `instill <topic>` | start topic-scoped instill session |

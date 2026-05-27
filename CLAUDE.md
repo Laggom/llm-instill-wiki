@@ -11,7 +11,7 @@ This file is the **schema** for this wiki. It defines the structure, format, and
 - This schema is written in English for token efficiency and broad agent compatibility across tools.
 - **Respond to the user in Korean (존댓말 — polite form)** unless explicitly told otherwise.
 - Wiki page titles, claims, and content may be in any language — match the source. The schema (this file, page frontmatter keys, scheduler IDs) stays in English.
-- User commands listed in §8 are in Korean by convention but the LLM should also recognize obvious English equivalents (`ingest X`, `query Q`, `lint`, etc.).
+- User commands listed in §9 are in Korean by convention but the LLM should also recognize obvious English equivalents (`ingest X`, `query Q`, `lint`, etc.).
 
 ---
 
@@ -36,9 +36,11 @@ This file is the **schema** for this wiki. It defines the structure, format, and
 │   ├── sources/       # one page per raw source
 │   ├── concepts/      # ideas, theories, patterns
 │   └── entities/      # people, tools, orgs, products
-└── instill/           # learning state
-    ├── _deck.json     # FSRS card state (machine-owned)
-    └── <topic>.md     # narrative coaching notes per topic (lazy-load)
+├── instill/           # learning state
+│   ├── _deck.json     # FSRS card state (machine-owned)
+│   └── <topic>.md     # narrative coaching notes per topic (lazy-load)
+├── .python-policy     # `venv` or `system` (gitignored, written on first pip install — see §8)
+└── .venv/             # virtual env (gitignored, exists iff policy = venv)
 ```
 
 New categories such as `wiki/comparisons/` or `wiki/timelines/` may be added later. When adding a category, update this file in the same change.
@@ -111,13 +113,13 @@ Both Obsidian-style `[[wiki/path/page]]` and plain markdown `[text](path)` are a
 
 **`raw/` stores markdown only.** The repo intentionally has no Python conversion dependency, so the normalization step depends on the host tool's native capabilities:
 
-1. **Source is already markdown** → just move/copy it into `raw/<slug>.md` (or if it already lives there, leave it).
-2. **Source is a format your host tool can read natively** (Claude Code and recent Cursor read PDFs natively; many tools read HTML/text) → read it, write a clean markdown version to `raw/<slug>.md`, then proceed.
-3. **Source is a format your host tool cannot read** → a Python converter package (e.g., `markitdown`, `pypdf`, `pandoc` bindings) may be installed. Before the first such install, follow the Python environment policy in §8 — that section governs the venv-vs-global prompt and prevents repeating the question every session. After install, convert the source to markdown, write it to `raw/<slug>.md`, then proceed.
+- **Source is already markdown** → move/copy it into `raw/<slug>.md` (or leave it in place if already there).
+- **Source is a format your host tool can read natively** (Claude Code and recent Cursor read PDFs natively; many tools read HTML/text) → read it, write a clean markdown version to `raw/<slug>.md`, then proceed.
+- **Source is a format your host tool cannot read** → a Python converter package (e.g., `markitdown`, `pypdf`, `pandoc` bindings) may be installed. Before the first such install, follow the Python environment policy in §8 — that section governs the venv-vs-system prompt and prevents repeating the question every session. After install, convert to markdown, write to `raw/<slug>.md`, then proceed.
 
 Choose `<slug>` as a short kebab-case identifier matching what the source page in `wiki/sources/` will use. If the user proposes a slug, honor it.
 
-Steps (assuming `raw/<slug>.md` now exists):
+**Ingest steps** (run once `raw/<slug>.md` exists):
 
 1. Open the raw file **read-only** and extract the key content.
 2. Create `wiki/sources/<slug>.md` with summary, key claims, and quotable lines.
@@ -308,9 +310,8 @@ Honor the choice and **record it** in `.python-policy` at the repo root (one of 
 - Never install a package the workflow does not actually need.
 - Surface the install command to the user before running it ("about to run: `pip install markitdown` — OK?") unless the user has explicitly granted blanket permission for that session.
 - If `.python-policy` is missing but `.venv/` exists, treat it as `venv` (the venv wins as evidence of past intent).
-- Never `pip install` into a Claude Code managed environment if the host tool restricts it — fall back to telling the user.
 
-Update `.gitignore` to include `.venv/` and `.python-policy` (already covered if they are added there).
+`.gitignore` already covers `.venv/` and `.python-policy`.
 
 ---
 
