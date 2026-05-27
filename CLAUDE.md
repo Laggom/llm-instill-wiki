@@ -61,17 +61,18 @@ updated: YYYY-MM-DD
 sources: 1            # how many raw/ sources back this page
 status: stub | draft | stable
 instill:              # optional — see §4.4
-  - id: cc-mem-001
+  - id: cc-mem-001    # internal handle (LLM ↔ scheduler only — never shown to the user)
     claim: "single-line testable assertion"
     importance: high | med | low
     solo-target: recall | uni | multi | relational | transfer
-    skip: false
+    status: proposed | active | skipped   # ingest writes 'proposed'; lint (§4.3) promotes to 'active' or drops to 'skipped'
 ---
 ```
 
 - `type` must match the directory the page sits in.
 - For `entities/` pages, add `kind: person | tool | org | product`.
 - Bump `updated` and `sources` whenever a new raw source extends the page.
+- **Card `id` is internal.** It addresses the scheduler (`instill/_deck.json`) and lives in frontmatter, but is never spoken to the user. User-facing references always use `topic` + the `claim` text.
 
 ### 2.2 Body structure
 
@@ -126,10 +127,10 @@ Choose `<slug>` as a short kebab-case identifier matching what the source page i
 3. For each concept, person, or tool mentioned, create or update a page under `wiki/concepts/` or `wiki/entities/`.
 4. If new information contradicts something on another page, leave a note on both sides (`> ⚠ YYYY-MM-DD: conflicts with source X, needs reconciliation`).
 5. Add new pages to `wiki/index.md`.
-6. **Instill card extraction** — for each new or updated page, populate the `instill:` array in its frontmatter with atomic claims (cards). Each card needs `id` (wiki-globally unique, e.g., `cc-mem-001`), `claim` (one line, testable), `importance` (high/med/low), and `solo-target` (recall/uni/multi/relational/transfer). For each new card, call `python tools/instill_sched.py enroll --id <id> --importance <h/m/l> --topic <topic>` to register it in the scheduler.
-7. Append an entry to `wiki/log.md` (include new card count).
+6. **Instill card proposal** — for each new or updated page, populate the `instill:` array in its frontmatter with atomic claims (cards). Each card needs `id` (wiki-globally unique, e.g., `cc-mem-001` — internal handle, never shown to the user), `claim` (one line, testable), `importance` (high/med/low), `solo-target` (recall/uni/multi/relational/transfer), and `status: proposed`. **Do not call `enroll` at ingest.** Proposed cards stay inert in frontmatter until the next `lint` (§4.3) promotes, edits, or drops them in light of the matured wiki.
+7. Append an entry to `wiki/log.md` (include proposed card count).
 
-Touching 10–15 pages during one ingest is normal. Card extraction is automatic and needs no user approval — the user can drop unwanted cards at the start of the next instill session (see §4.4).
+Touching 10–15 pages during one ingest is normal. Card proposal is automatic and needs no user approval — nothing enters the scheduler until lint promotes it. This deferral keeps single-source atomization from calcifying before the wiki develops cross-page context.
 
 ### 4.2 Query — answering a question
 
@@ -148,9 +149,14 @@ Triggered by `lint` or `wiki 점검해줘`. Detect:
 - **Missing pages** — concepts mentioned repeatedly without a dedicated page.
 - **Missing cross-refs** — two pages clearly related but with no link between them.
 - **Data gaps** — holes that a web search could fill.
-- **Orphan instill cards** — card IDs in `instill/_deck.json` whose corresponding `claim` no longer exists in any wiki page's frontmatter (e.g., the page was deleted or the `instill:` entry was removed). Report each and ask the user whether to `skip` them via the scheduler.
+- **Proposed-card review (promote / edit / drop)** — walk every card with `status: proposed` across the current wiki. With multi-source context now available, decide per card:
+  - **promote** → set `status: active` in the frontmatter, then call `python tools/instill_sched.py enroll --id <id> --importance <h/m/l> --topic <topic>`.
+  - **edit** → refine the `claim` text (id stays), then promote.
+  - **drop** → set `status: skipped` (no enroll). Removed from candidate pool, frontmatter entry kept for traceability.
+  Present candidates to the user grouped by `topic`, identified by `claim` text — **never by `id`**. Batch the decisions and confirm in one round.
+- **Active-card drift** — for every `status: active` card, check whether the `claim` text in the wiki still matches what was enrolled. If the wiki claim was rewritten, id+history stay; just note the refresh (no scheduler call needed — the LLM reads `claim` from frontmatter at session time). If the `claim` was removed from the wiki entirely, propose `skip` and on user OK call `skip --id <id>` and set frontmatter `status: skipped`.
 
-Record findings in `wiki/log.md` under a `lint` entry. Auto-fix the mechanical issues (e.g., add a backlink for an orphan). Surface judgment calls (contradictions) to the user.
+Record findings in `wiki/log.md` under a `lint` entry. Auto-fix mechanical issues (e.g., add a backlink for an orphan). Surface judgment calls (contradictions, card promotion/drop) to the user.
 
 ### 4.4 Instill — pushing knowledge into the user (FSRS + SOLO)
 
@@ -170,7 +176,7 @@ Record findings in `wiki/log.md` under a `lint` entry. Auto-fix the mechanical i
 **Session flow**:
 
 1. **Pull today's queue**: `python tools/instill_sched.py today [--topic X] --limit 8 --new-limit 3`. Receives JSON with `due` and `new_candidates`.
-2. **New-card drop step**: if `new_candidates` is non-empty, show the list to the user and ask "any you'd like to skip?". For each dropped card, call `python tools/instill_sched.py skip --id X`.
+2. **New-card preview**: if `new_candidates` is non-empty (these are cards just promoted from `proposed` by the last lint), show them to the user as a topic-grouped list of `claim` text — **never show the `id`**. Ask "any you'd like to skip?". For each one the user names (by claim or by ordinal like "the second one"), the LLM maps it to `id` internally and calls `python tools/instill_sched.py skip --id X`.
 3. **Begin the session**: up to 8 cards (due + new ≤ 3). Interleave the order.
 4. **Per card** (the scheduler returns `id` only — text lives in the wiki):
    - **Look up the card's `claim`** by `id` in the corresponding wiki page's frontmatter `instill:` array. Read the `solo-target` too.
@@ -206,8 +212,10 @@ A card's `solo-target` is the *final* depth to reach. Start at recall and climb 
 - **If they don't know, give a hint before giving the answer.** Self-correction yields the strongest retention.
 - **Confirmations must be specific**: not "correct" but "*synthesizing at ingest time* — that's the key part you nailed."
 - **Keep replies short.** No tables or sectioned essays like in query. One or two sentences plus one question.
+- **Don't demand long explanations from the user.** The user answers the *core direction* / *choice* / *short answer*. The LLM supplies the mechanism, the "why", and any deeper connection in its follow-up — even when the card's `solo-target` is `relational` or `transfer`. Phrase questions to converge on a short answer (a choice, a placement, a single concept), not on a paragraph of reasoning. The retrieval load stays on the user; the explanatory load stays on the LLM.
 - **The wiki is read-only during a session.** Scheduler calls only mutate `instill/_deck.json`; `wiki/` and `raw/` are untouched.
 - **Interleaving is the default.** Topic-scoped (`instill <topic>`) is allowed but Bjork supports mixing.
+- **Never expose card `id` to the user.** Ids are internal scheduler handles. In every user-facing message — preview, drop prompt, lint card review, narrative notes, log entries — refer to cards by `topic` + `claim` text. When the user names a card ambiguously, resolve by claim match or ordinal, not by asking for an id.
 
 **Question quality** (critical — bad questions kill the session):
 
