@@ -113,7 +113,7 @@ Both Obsidian-style `[[wiki/path/page]]` and plain markdown `[text](path)` are a
 
 1. **Source is already markdown** → just move/copy it into `raw/<slug>.md` (or if it already lives there, leave it).
 2. **Source is a format your host tool can read natively** (Claude Code and recent Cursor read PDFs natively; many tools read HTML/text) → read it, write a clean markdown version to `raw/<slug>.md`, then proceed.
-3. **Source is a format your host tool cannot read** → do NOT `pip install` anything. Stop and tell the user: "I can't read this format in this environment. Please convert it to markdown yourself (e.g., with `pandoc`, `markitdown`, or any web converter) and either drop the result into `raw/` or give me its path, then ask me again." Resume only after a readable markdown version exists.
+3. **Source is a format your host tool cannot read** → a Python converter package (e.g., `markitdown`, `pypdf`, `pandoc` bindings) may be installed. Before the first such install, follow the Python environment policy in §8 — that section governs the venv-vs-global prompt and prevents repeating the question every session. After install, convert the source to markdown, write it to `raw/<slug>.md`, then proceed.
 
 Choose `<slug>` as a short kebab-case identifier matching what the source page in `wiki/sources/` will use. If the user proposes a slug, honor it.
 
@@ -285,7 +285,36 @@ Append-only. The newest entry is at the **bottom**, not the top (chronological).
 
 ---
 
-## 8. Common user commands
+## 8. Python environment
+
+When a workflow legitimately needs a Python package beyond the stdlib (e.g., a PDF/HTML converter during ingest §4.1), the LLM may install it — but never silently.
+
+**First-time prompt**: before the first `pip install` in this repo, ask the user **exactly once**:
+
+> "Need to install `<package>`. Create a `.venv` to isolate it, or install into the system / current Python? (recommendation: venv)"
+
+Honor the choice and **record it** in `.python-policy` at the repo root (one of `venv` or `system`, single line). This file is gitignored. Future install needs read this file and proceed without re-asking.
+
+**If `venv`** is chosen:
+1. Run `python -m venv .venv` (if `.venv/` does not already exist).
+2. Use the venv's interpreter for all subsequent Python invocations in this repo — including `tools/instill_sched.py`. On Unix: `.venv/bin/python`. On Windows: `.venv/Scripts/python.exe`.
+3. Install with `.venv/bin/pip install <package>` (or Windows equivalent).
+
+**If `system`** is chosen:
+1. Use whatever Python the user already has on PATH.
+2. Install with `pip install --user <package>` when possible to avoid touching system site-packages without permission.
+
+**Rules**:
+- Never install a package the workflow does not actually need.
+- Surface the install command to the user before running it ("about to run: `pip install markitdown` — OK?") unless the user has explicitly granted blanket permission for that session.
+- If `.python-policy` is missing but `.venv/` exists, treat it as `venv` (the venv wins as evidence of past intent).
+- Never `pip install` into a Claude Code managed environment if the host tool restricts it — fall back to telling the user.
+
+Update `.gitignore` to include `.venv/` and `.python-policy` (already covered if they are added there).
+
+---
+
+## 9. Common user commands
 
 Natural language — no slash commands.
 
@@ -300,7 +329,7 @@ Natural language — no slash commands.
 
 ---
 
-## 9. Future extensions (not yet adopted)
+## 10. Future extensions (not yet adopted)
 
 - **Search engine**: if pages exceed ~100, consider a local markdown search tool such as [[entities/qmd]].
 - **Dataview-style queries**: dynamic tables/lists from frontmatter.

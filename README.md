@@ -162,7 +162,7 @@ After setup, tell the user the first action: drop a source file into `raw/` and 
 
 ## Source of truth
 
-- **`CLAUDE.md`** — the operative schema. Read it first. Defines four workflows: ingest, query, instill, lint. Sections §1–§9 specify directory layout, page format, naming, workflows, principles, and user commands.
+- **`CLAUDE.md`** — the operative schema. Read it first. Defines four workflows: ingest, query, instill, lint. Sections §1–§10 specify directory layout, page format, naming, workflows, principles, Python environment policy, and user commands.
 
 If `CLAUDE.md` and this README disagree, `CLAUDE.md` wins.
 
