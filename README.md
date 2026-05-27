@@ -96,7 +96,7 @@ bash install.sh        # macOS / Linux / WSL
 
 처음에 해볼 만한 흐름은 이렇습니다.
 
-1. 마음에 드는 글·논문·블로그 포스트를 `raw/<이름>.md` 로 떨어뜨려요. (PDF 같이 markdown 이 아닌 파일은 agent 가 알아서 markdown 으로 변환해 raw/ 에 저장해줍니다 — host 도구가 그 포맷을 읽을 수 있다면. Claude Code 와 최신 Cursor 는 PDF 를 네이티브로 읽습니다. 안 되는 도구라면 pandoc 같은 외부 변환기를 쓰시라고 안내해줄 거예요.)
+1. 마음에 드는 글·논문·블로그 포스트를 `raw/<이름>.md` 로 떨어뜨려요.
 2. Claude Code 에 "`raw/<이름>.md` ingest 해줘" 라고 합니다.
 3. LLM 이 위키 페이지를 만들고, 카드를 추출하고, 스케줄러에 등록까지 다 해줍니다.
 4. 며칠 후, 학습하고 싶을 때 "instill" 한 마디.
