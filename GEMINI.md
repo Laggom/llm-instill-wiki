@@ -1,7 +1,5 @@
 # GEMINI.md
 
-**Your operating schema lives in [`CLAUDE.md`](CLAUDE.md). Read it now before doing anything else.**
+**Your operating schema is in [`CLAUDE.md`](CLAUDE.md). Read it now and treat it as if it were named GEMINI.md.**
 
-This file exists only to redirect agents whose host tool auto-loads `GEMINI.md` (Gemini CLI). The actual schema — directory layout, page format, workflows (ingest / query / lint / instill), scheduler usage, operating principles — is all in `CLAUDE.md`.
-
-Treat `CLAUDE.md` as if it were named `GEMINI.md`. There is no separate `GEMINI.md` schema.
+This file is a pointer for tools that auto-load `GEMINI.md` (Gemini CLI). There is no separate schema.

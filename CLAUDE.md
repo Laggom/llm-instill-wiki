@@ -36,12 +36,12 @@ This file is the **schema** for this wiki. It defines the structure, format, and
 │   ├── sources/       # one page per raw source
 │   ├── concepts/      # ideas, theories, patterns
 │   └── entities/      # people, tools, orgs, products
-├── instill/           # learning state
-│   ├── _deck.json     # FSRS card state (machine-owned)
-│   └── <topic>.md     # narrative coaching notes per topic (lazy-load)
-├── .python-policy     # `venv` or `system` (gitignored, written on first pip install — see §8)
-└── .venv/             # virtual env (gitignored, exists iff policy = venv)
+└── instill/           # learning state
+    ├── _deck.json     # FSRS card state (machine-owned)
+    └── <topic>.md     # narrative coaching notes per topic (lazy-load)
 ```
+
+Runtime artifacts not part of the schema layout: `.venv/` and `.python-policy` may appear at the repo root once §8 is exercised (both gitignored).
 
 New categories such as `wiki/comparisons/` or `wiki/timelines/` may be added later. When adding a category, update this file in the same change.
 
