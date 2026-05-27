@@ -59,6 +59,24 @@ ingest 와 query 는 흔합니다. instill 이 다른 점이에요.
 
 `raw/`, `wiki/`, `instill/` 은 본인의 개인 콘텐츠라 `.gitignore` 로 빠져 있습니다. clone 하시면 이 디렉터리들은 비어 있을 거예요. 본인의 글·메모를 넣고 채우시면 됩니다.
 
+## 필요한 것
+
+기본적으로 **[Claude Code](https://docs.anthropic.com/en/docs/claude-code)** 에서 동작하도록 만들어졌습니다. Claude Code 는 프로젝트 루트의 `CLAUDE.md` 를 매 세션 시작 시 자동으로 컨텍스트에 주입해주는데, 이 schema 가 그 동작에 기대고 있어요.
+
+다른 코딩 CLI 에서도 쓰실 수 있습니다. 다만 약간의 손이 필요해요.
+
+- **Cursor / Codex / 기타 AGENTS.md 호환 도구** — `CLAUDE.md` 를 `AGENTS.md` 로 복사하거나 심볼릭 링크 거시면 됩니다. 두 파일의 역할이 사실상 같습니다.
+  ```bash
+  # macOS / Linux
+  ln -s CLAUDE.md AGENTS.md
+  # Windows (PowerShell, 관리자 권한)
+  New-Item -ItemType SymbolicLink -Path AGENTS.md -Target CLAUDE.md
+  ```
+- **Gemini CLI** — `CLAUDE.md` 를 `GEMINI.md` 로 같은 방식으로 처리.
+- **기타 환경** — 자동 컨텍스트 로드가 없는 도구라면 매 세션 시작 시 `CLAUDE.md` 내용을 시스템 프롬프트로 직접 붙여 넣으셔야 합니다. 번거롭지만 동작은 합니다.
+
+`tools/instill_sched.py` 는 **Python 3.10+** 필요합니다. 표준 라이브러리만 쓰니까 별도 패키지 설치는 없어요.
+
 ## 시작하는 법
 
 ```bash
