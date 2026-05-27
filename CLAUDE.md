@@ -107,23 +107,25 @@ Both Obsidian-style `[[wiki/path/page]]` and plain markdown `[text](path)` are a
 
 ### 4.1 Ingest — adding a new source
 
-**raw/ stores markdown only.** Non-markdown sources (PDF, HTML, EPUB, etc.) must be converted to markdown before they live in `raw/`. The repo intentionally has no Python conversion dependency.
+**The user gives you a path, not a finished raw file.** The user may point you at any source — a file in Downloads, a path inside `raw/`, even a URL — and say "ingest this". Your job is to normalize it into `raw/<slug>.md` and then run the ingest steps below.
 
-When the user hands you a non-markdown source, follow this fallback chain:
+**`raw/` stores markdown only.** The repo intentionally has no Python conversion dependency, so the normalization step depends on the host tool's native capabilities:
 
-1. **If your host tool can natively read the format** (Claude Code reads PDFs natively; recent Cursor also does), read it directly and write the markdown into `raw/<slug>.md` yourself. Then proceed with the normal ingest steps below.
-2. **If your host tool cannot read the format**, do NOT pip-install anything. Stop and tell the user: "I can't read this file type in this environment. Please convert it to markdown first (e.g., with `pandoc`, `markitdown`, or any web converter) and place it as `raw/<slug>.md`, then ask me again." Resume ingest only after the markdown is in place.
+1. **Source is already markdown** → just move/copy it into `raw/<slug>.md` (or if it already lives there, leave it).
+2. **Source is a format your host tool can read natively** (Claude Code and recent Cursor read PDFs natively; many tools read HTML/text) → read it, write a clean markdown version to `raw/<slug>.md`, then proceed.
+3. **Source is a format your host tool cannot read** → do NOT `pip install` anything. Stop and tell the user: "I can't read this format in this environment. Please convert it to markdown yourself (e.g., with `pandoc`, `markitdown`, or any web converter) and either drop the result into `raw/` or give me its path, then ask me again." Resume only after a readable markdown version exists.
 
-Steps:
+Choose `<slug>` as a short kebab-case identifier matching what the source page in `wiki/sources/` will use. If the user proposes a slug, honor it.
 
-1. The user drops (or you create from a converted source) a file at `raw/<slug>.md`.
-2. The LLM opens the raw file **read-only** and extracts the key content.
-3. Create `wiki/sources/<slug>.md` with summary, key claims, and quotable lines.
-4. For each concept, person, or tool mentioned, create or update a page under `wiki/concepts/` or `wiki/entities/`.
-5. If new information contradicts something on another page, leave a note on both sides (`> ⚠ YYYY-MM-DD: conflicts with source X, needs reconciliation`).
-6. Add new pages to `wiki/index.md`.
-7. **Instill card extraction** — for each new or updated page, populate the `instill:` array in its frontmatter with atomic claims (cards). Each card needs `id` (wiki-globally unique, e.g., `cc-mem-001`), `claim` (one line, testable), `importance` (high/med/low), and `solo-target` (recall/uni/multi/relational/transfer). For each new card, call `python tools/instill_sched.py enroll --id <id> --importance <h/m/l> --topic <topic>` to register it in the scheduler.
-8. Append an entry to `wiki/log.md` (include new card count).
+Steps (assuming `raw/<slug>.md` now exists):
+
+1. Open the raw file **read-only** and extract the key content.
+2. Create `wiki/sources/<slug>.md` with summary, key claims, and quotable lines.
+3. For each concept, person, or tool mentioned, create or update a page under `wiki/concepts/` or `wiki/entities/`.
+4. If new information contradicts something on another page, leave a note on both sides (`> ⚠ YYYY-MM-DD: conflicts with source X, needs reconciliation`).
+5. Add new pages to `wiki/index.md`.
+6. **Instill card extraction** — for each new or updated page, populate the `instill:` array in its frontmatter with atomic claims (cards). Each card needs `id` (wiki-globally unique, e.g., `cc-mem-001`), `claim` (one line, testable), `importance` (high/med/low), and `solo-target` (recall/uni/multi/relational/transfer). For each new card, call `python tools/instill_sched.py enroll --id <id> --importance <h/m/l> --topic <topic>` to register it in the scheduler.
+7. Append an entry to `wiki/log.md` (include new card count).
 
 Touching 10–15 pages during one ingest is normal. Card extraction is automatic and needs no user approval — the user can drop unwanted cards at the start of the next instill session (see §4.4).
 
