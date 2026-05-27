@@ -10,15 +10,16 @@ Andrej Karpathy 가 제안한 [LLM Wiki 패턴](https://gist.github.com/karpathy
 
 그런데 여전히 절반이 남습니다. 위키가 아무리 잘 정리돼도 그건 **밖에 있는 지식** 입니다. 진짜로 제 것이 되려면 머릿속으로 옮겨야 합니다. 그 과정을 LLM 이 도와줄 수 있다는 게 이 프로젝트의 출발점이에요.
 
-## 세 가지 모드
+## 네 가지 모드
 
 | 모드 | 누가 답하나요 | 무엇을 하나요 |
 |---|---|---|
 | ingest | LLM | 원본 소스를 읽고 위키 페이지로 정리합니다 |
 | query | LLM | 위키를 뒤져서 질문에 답합니다 |
 | **instill** | **사용자** | LLM 이 묻고, **사용자가 답합니다**. 머릿속에 옮기는 과정입니다 |
+| lint | LLM | 모순·고립 페이지·갱신 누락을 찾아 위키를 정돈합니다 |
 
-ingest 와 query 는 흔합니다. instill 이 다른 점이에요.
+ingest 와 query 는 흔합니다. instill 이 다른 점이에요. lint 는 가끔 청소.
 
 ## instill 이 어떻게 다른가요
 
@@ -190,13 +191,14 @@ Do **not** create any sample raw/wiki content unless the user asks. The schema i
 
 If `CLAUDE.md` and this README disagree, `CLAUDE.md` wins.
 
-## Three modes
+## Four modes
 
 | Mode | Who answers | Output |
 |---|---|---|
 | ingest | LLM | raw source → wiki pages + extracted cards enrolled in scheduler |
 | query | LLM | synthesized answer from wiki, optionally promoted back to a new wiki page |
 | instill | **user** | retrieval practice with FSRS-scheduled cards; LLM grades, never lectures first |
+| lint | LLM | periodic housekeeping: contradictions, stale claims, orphan pages, missing cross-refs |
 
 ## Layout
 
