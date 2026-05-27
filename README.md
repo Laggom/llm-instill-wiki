@@ -118,6 +118,74 @@ This section is written for coding agents that land in this repo. It mirrors wha
 
 A Claude Code operational schema implementing an LLM-maintained personal wiki layered with an active-recall learning loop. The schema itself is the deliverable; user content (`raw/`, `wiki/`, `instill/`, `chats/`) is gitignored.
 
+## Installation (run this when the user clones the repo)
+
+When a user has just cloned this repo and asks you to set it up, perform these steps. Detect the host tool first — different tools auto-load different filenames.
+
+**1. Verify Python.** Required for `tools/instill_sched.py`.
+
+```bash
+python --version    # need >= 3.10
+```
+
+If missing or too old, instruct the user to install Python 3.10+. The scheduler uses stdlib only; no `pip install` needed.
+
+**2. Create the gitignored content directories.**
+
+```bash
+mkdir -p raw wiki instill
+mkdir -p wiki/sources wiki/concepts wiki/entities
+```
+
+**3. Wire the schema file to whatever filename your host tool auto-loads.**
+
+| Host tool | Expected filename | Action |
+|---|---|---|
+| Claude Code | `CLAUDE.md` | already correct — no action |
+| Cursor, Codex, generic AGENTS.md | `AGENTS.md` | symlink or copy `CLAUDE.md` → `AGENTS.md` |
+| Gemini CLI | `GEMINI.md` | symlink or copy `CLAUDE.md` → `GEMINI.md` |
+| Other / unknown | n/a | tell user to paste `CLAUDE.md` contents into their system prompt each session |
+
+Symlink commands (cross-platform):
+
+```bash
+# macOS / Linux
+ln -s CLAUDE.md AGENTS.md
+
+# Windows PowerShell (Developer Mode on, or admin shell)
+New-Item -ItemType SymbolicLink -Path AGENTS.md -Target CLAUDE.md
+```
+
+If symlinks fail (e.g., Windows without dev mode), fall back to `cp CLAUDE.md AGENTS.md` and warn the user that future schema edits must be propagated.
+
+**4. Initialize empty wiki scaffolding** so subsequent workflows have files to update:
+
+```bash
+# wiki/index.md
+cat > wiki/index.md <<'EOF'
+# Index
+
+## Sources
+## Concepts
+## Entities
+EOF
+
+# wiki/log.md
+echo "# Log" > wiki/log.md
+```
+
+**5. Sanity-check the scheduler.**
+
+```bash
+python tools/instill_sched.py stats
+```
+
+Expected: `{"total": 0, "by_state": {}, "due_today": 0, ...}`. If you see a stack trace, do not proceed — surface the error to the user.
+
+**6. Confirm to the user.** Tell them setup is done and suggest the first action: drop a source file into `raw/` and ask for ingest.
+
+Do **not** create any sample raw/wiki content unless the user asks. The schema is content-agnostic; their first source should be their own.
+
 ## Source of truth
 
 - **`CLAUDE.md`** — the operative schema. Read it first. Defines four workflows: ingest, query, instill, lint. Sections §1–§9 specify directory layout, page format, naming, workflows, principles, and user commands.
