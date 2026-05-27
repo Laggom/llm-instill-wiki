@@ -26,9 +26,9 @@ ingest, query, lint 는 흔합니다. instill 이 다른 점이에요.
 학습과학에서 검증된 몇 가지를 그대로 적용했습니다.
 
 - **Testing effect** (Roediger & Karpicke) — 다시 읽기보다 *꺼내 쓰기* 가 장기기억에 훨씬 잘 남습니다. 그래서 instill 은 무조건 사용자가 먼저 답합니다. LLM 은 평가만 합니다.
-- **Spacing effect** (Cepeda et al.) — 같은 시간 공부해도 간격을 두면 정착률이 올라갑니다. 카드별로 다음 복습 시점을 계산해서 *오늘 할 것* 만 뽑아냅니다.
+- **Spacing effect** (Cepeda et al.) — 같은 시간 공부해도 간격을 두면 정착률이 올라갑니다. 토픽별로 다음 복습 시점을 계산해서 *오늘 할 것* 만 뽑아냅니다.
+- **Encoding variability** (Bjork; Smith & Handy) — 같은 개념도 *매번 다른 각도* 로 꺼내야 기억이 단단해집니다. 그래서 스케줄링 단위는 frozen 카드가 아니라 **토픽**이고, 질문은 매 세션 위키 페이지 전체에서 새로 구성됩니다.
 - **Desirable difficulties** (Bjork) — 너무 쉬우면 학습이 안 됩니다. 약간 실패할 정도가 적정. 토픽을 섞어 인터리빙으로 진행합니다.
-- **SOLO taxonomy** (Biggs) — 이해의 깊이를 5단계로 나눠 (단순 회상 → 응용·전이), 카드가 익숙해질수록 더 깊은 질문을 던집니다.
 
 스케줄링은 **FSRS-5** 로 돌립니다. Anki 가 2024 이후 기본으로 쓰는 알고리즘 계열이에요. 별도 설치는 필요 없습니다.
 
@@ -36,13 +36,13 @@ ingest, query, lint 는 흔합니다. instill 이 다른 점이에요.
 
 `instill` 한 마디면 시작됩니다.
 
-1. 스케줄러가 오늘 복습할 카드 + 신규 후보를 뽑아 줍니다.
+1. 스케줄러가 오늘 복습할 토픽 + 신규 후보를 뽑아 줍니다.
 2. 신규 후보 중 빼고 싶은 게 있으면 사용자가 drop 합니다.
-3. 최대 8장 (≈5분) 진행합니다. 카드마다 LLM 이 한 줄짜리 질문을 던지고 사용자가 답합니다.
-4. LLM 이 답을 평가해 다음 복습 시점을 자동으로 잡습니다.
+3. 기본 5문제 (recall 1-2 + reasoning 2-3 + synthesis 1) 가 진행됩니다. 매 질문은 토픽의 위키 페이지 본문에서 그때그때 새로 구성됩니다.
+4. LLM 이 ✓ / ~ / ✗ 셋 중 하나로 평가하고, 모호하면 Socratic 1-2회 후 위키 인용으로 정정합니다. 그 결과가 다음 복습 시점을 자동으로 잡습니다.
 5. 끝나고 더 하고 싶으면 "더 해줘", 그만하려면 "그만". 그냥 자연어로 말씀하시면 됩니다.
 
-5분이 한도라고 정한 건, 그 이상은 어차피 잘 안 한다는 게 정직한 가정이라서요.
+5문제가 기본인 건 recall + reasoning + synthesis 를 한 번씩 만나기에 적당해서요. 더 하고 싶으면 얼마든지 늘리실 수 있습니다.
 
 ## 디렉터리 구조
 
@@ -54,7 +54,7 @@ ingest, query, lint 는 흔합니다. instill 이 다른 점이에요.
 │   └── instill_sched.py    ← FSRS 스케줄러 (stdlib only)
 ├── raw/            ← 본인의 원본 소스 (이 repo 에는 포함 안 됨)
 ├── wiki/           ← LLM 이 정리한 페이지 (이 repo 에는 포함 안 됨)
-└── instill/        ← 카드 스케줄 + 토픽별 학습 노트 (이 repo 에는 포함 안 됨)
+└── instill/        ← 토픽 스케줄(`_deck.json`) + 토픽별 학습 노트 (이 repo 에는 포함 안 됨)
 ```
 
 `raw/`, `wiki/`, `instill/` 은 본인의 개인 콘텐츠라 `.gitignore` 로 빠져 있습니다. clone 하시면 이 디렉터리들은 비어 있을 거예요. 본인의 글·메모를 넣고 채우시면 됩니다.
@@ -170,10 +170,10 @@ If `CLAUDE.md` and this README disagree, `CLAUDE.md` wins.
 
 | Mode | Who answers | Output |
 |---|---|---|
-| ingest | LLM | raw source → wiki pages + extracted cards enrolled in scheduler |
+| ingest | LLM | raw source → wiki pages (no card extraction; topics emerge during instill) |
 | query | LLM | synthesized answer from wiki, optionally promoted back to a new wiki page |
-| lint | LLM | periodic housekeeping: contradictions, stale claims, orphan pages, missing cross-refs |
-| instill | **user** | retrieval practice with FSRS-scheduled cards; LLM grades, never lectures first |
+| lint | LLM | periodic housekeeping: contradictions, stale claims, orphan pages, missing cross-refs, topic-tag hygiene |
+| instill | **user** | retrieval practice; topic-level FSRS scheduling, questions composed fresh from wiki each session; verdict ✓/~/✗ + Socratic 1-2 + reverse mode |
 
 ## Layout
 
@@ -185,42 +185,49 @@ install.sh, install.ps1         setup scripts (idempotent)
 tools/instill_sched.py          FSRS-5 scheduler (stdlib only, CLI)
 raw/        (gitignored)        immutable source clippings
 wiki/       (gitignored)        LLM-maintained pages: sources/, concepts/, entities/, index.md, log.md
-instill/    (gitignored)        _deck.json (FSRS state) + per-topic narrative notes
+instill/    (gitignored)        _deck.json (FSRS state, topic-keyed) + per-topic narrative notes
+wiki/_instill/  (gitignored)    append-only instill session logs (one file per session)
 ```
 
 ## Scheduler CLI
 
 ```
 python tools/instill_sched.py today [--topic T] [--limit 8] [--new-limit 3]
-python tools/instill_sched.py review --id ID --grade {again,hard,good,easy}
-python tools/instill_sched.py enroll --id ID [--importance high|med|low] [--topic T]
-python tools/instill_sched.py skip --id ID
+python tools/instill_sched.py review --topic T --grade {again,hard,good,easy}
+python tools/instill_sched.py enroll --topic T [--importance high|med|low] [--anchor PATH]
+python tools/instill_sched.py skip --topic T
 python tools/instill_sched.py stats
 ```
 
-Never compute FSRS state in-context. Always shell out to this script. Deck state is at `instill/_deck.json`.
+Never compute FSRS state in-context. Always shell out to this script. Deck state is at `instill/_deck.json`, keyed by topic tag (kebab-case).
 
-## Card model
+## Topic model
 
-Cards live in the wiki page frontmatter:
+Topics are not declared in wiki frontmatter — they emerge during instill sessions and are tracked only in `instill/_deck.json`:
 
-```yaml
-instill:
-  - id: cc-mem-001              # globally unique
-    claim: "single-line testable assertion"
-    importance: high|med|low
-    solo-target: recall|uni|multi|relational|transfer
-    skip: false
+```json
+{
+  "topics": {
+    "picd": {
+      "importance": "high",
+      "anchor": "concepts/picd.md",
+      "stability": 3.13, "difficulty": 5.31,
+      "due": "2026-05-30", "last_review": "2026-05-27",
+      "reps": 3, "lapses": 0, "last_grade": "good",
+      "state": "review"
+    }
+  }
+}
 ```
 
-IDs must be wiki-globally unique. The scheduler keys off `id` only — it does not parse wiki frontmatter; ingest must call `enroll` explicitly.
+Tag names are kebab-case. Reuse existing tags before inventing new ones; silent rename forbidden (breaks cumulative history).
 
 ## Workflow contract
 
-- **ingest** must (1) read raw, (2) produce/update wiki pages, (3) extract `instill:` cards into frontmatter, (4) call `enroll` per new card, (5) update `wiki/index.md` and `wiki/log.md`. No user approval gate at ingest.
+- **ingest** must (1) read raw, (2) produce/update wiki pages, (3) update `wiki/index.md` and `wiki/log.md`. No card extraction; no scheduler calls.
 - **query** reads `wiki/index.md` first. Cites every claim with `[[wiki-path]]`. Promote reusable synthesis back to a new concept page.
-- **instill** is read-only on `wiki/` and `raw/`. The scheduler may write `instill/_deck.json` and the LLM may write narrative notes to `instill/<topic>.md`. Session budget: ≤ 8 cards, ≤ 3 new cards.
-- **lint** detects contradictions, stale claims, orphan pages, missing cross-refs, data gaps. Auto-fix mechanical issues; ask the user about judgment calls.
+- **instill** is read-only on `wiki/` and `raw/` during the session. Scheduler writes to `instill/_deck.json`; session log writes to `wiki/_instill/<date>-<slug>.md`; narrative coaching notes write to `instill/<topic>.md`. Session budget: 5 questions default (recall 1-2 + reasoning 2-3 + synthesis 1), ≤ 3 new topics introduced. Verdict ✓/~/✗ + Socratic 1-2 + reverse mode. No sycophancy.
+- **lint** detects contradictions, stale claims, orphan pages, missing cross-refs, data gaps, and topic-tag hygiene (enroll candidates / stale topics / tag duplicates). Auto-fix mechanical issues; ask the user about judgment calls.
 
 ## Hard constraints
 
@@ -233,12 +240,13 @@ IDs must be wiki-globally unique. The scheduler keys off `id` only — it does n
 
 | Input | Action |
 |---|---|
-| `<path> ingest 해줘` | run ingest on the file at `<path>` (any location, any supported format); agent normalizes to `raw/<slug>.md` then runs the workflow including auto card extraction |
+| `<path> ingest 해줘` | run ingest on the file at `<path>` (any location, any supported format); agent normalizes to `raw/<slug>.md` then runs the workflow (no card extraction) |
 | `Q 답해줘` / `Q에 대해 wiki에 뭐가 있어?` | run query workflow |
 | `instill` | start mixed-deck instill session (interleaved across topics) |
-| `instill <topic>` | start topic-scoped instill session |
-| natural "continue" signal during session | extend current session by 4 cards |
-| natural "stop" signal during session | end instill session, update narrative notes + `wiki/log.md` |
+| `instill <topic-or-page>` | start scoped instill session |
+| `instill --review` / `약점 정리해줘` | weak-topic refresher only |
+| natural "continue" signal during session | extend current session by 3-5 questions |
+| natural "stop" signal during session | end instill session, save `wiki/_instill/<date>-<slug>.md` + narrative notes + `wiki/log.md` |
 | `lint` / `wiki 점검해줘` | run lint workflow |
 | `상태` / `progress` / `stats` | report scheduler stats (deck size, due today, avg stability) |
 

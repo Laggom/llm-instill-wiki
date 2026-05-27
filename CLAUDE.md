@@ -35,9 +35,10 @@ This file is the **schema** for this wiki. It defines the structure, format, and
 │   ├── log.md         # append-only activity log
 │   ├── sources/       # one page per raw source
 │   ├── concepts/      # ideas, theories, patterns
-│   └── entities/      # people, tools, orgs, products
+│   ├── entities/      # people, tools, orgs, products
+│   └── _instill/      # append-only session logs (one file per instill session)
 └── instill/           # learning state
-    ├── _deck.json     # FSRS card state (machine-owned)
+    ├── _deck.json     # FSRS topic state (machine-owned, keyed by topic tag)
     └── <topic>.md     # narrative coaching notes per topic (lazy-load)
 ```
 
@@ -60,19 +61,13 @@ created: YYYY-MM-DD
 updated: YYYY-MM-DD
 sources: 1            # how many raw/ sources back this page
 status: stub | draft | stable
-instill:              # optional — see §4.4
-  - id: cc-mem-001    # internal handle (LLM ↔ scheduler only — never shown to the user)
-    claim: "single-line testable assertion"
-    importance: high | med | low
-    solo-target: recall | uni | multi | relational | transfer
-    status: proposed | active | skipped   # ingest writes 'proposed'; lint (§4.3) promotes to 'active' or drops to 'skipped'
 ---
 ```
 
 - `type` must match the directory the page sits in.
 - For `entities/` pages, add `kind: person | tool | org | product`.
 - Bump `updated` and `sources` whenever a new raw source extends the page.
-- **Card `id` is internal.** It addresses the scheduler (`instill/_deck.json`) and lives in frontmatter, but is never spoken to the user. User-facing references always use `topic` + the `claim` text.
+- **No `instill:` block in frontmatter.** Topics (the units of FSRS scheduling, see §4.4) are not pre-extracted at ingest — they emerge during instill sessions from the wiki page itself, are tracked in `instill/_deck.json`, and use kebab-case tags. The wiki page is the *carrier* of questions, not a script of frozen claims.
 
 ### 2.2 Body structure
 
@@ -127,10 +122,9 @@ Choose `<slug>` as a short kebab-case identifier matching what the source page i
 3. For each concept, person, or tool mentioned, create or update a page under `wiki/concepts/` or `wiki/entities/`.
 4. If new information contradicts something on another page, leave a note on both sides (`> ⚠ YYYY-MM-DD: conflicts with source X, needs reconciliation`).
 5. Add new pages to `wiki/index.md`.
-6. **Instill card proposal** — for each new or updated page, populate the `instill:` array in its frontmatter with atomic claims (cards). Each card needs `id` (wiki-globally unique, e.g., `cc-mem-001` — internal handle, never shown to the user), `claim` (one line, testable), `importance` (high/med/low), `solo-target` (recall/uni/multi/relational/transfer), and `status: proposed`. **Do not call `enroll` at ingest.** Proposed cards stay inert in frontmatter until the next `lint` (§4.3) promotes, edits, or drops them in light of the matured wiki.
-7. Append an entry to `wiki/log.md` (include proposed card count).
+6. Append an entry to `wiki/log.md`.
 
-Touching 10–15 pages during one ingest is normal. Card proposal is automatic and needs no user approval — nothing enters the scheduler until lint promotes it. This deferral keeps single-source atomization from calcifying before the wiki develops cross-page context.
+Touching 10–15 pages during one ingest is normal. **Ingest no longer extracts instill cards** — topics enter the FSRS scheduler only when they surface in actual instill sessions (or via `lint` topic-enroll, §4.3). This keeps the wiki the source of truth for questions and avoids calcifying single-source atomizations before cross-page context develops.
 
 ### 4.2 Query — answering a question
 
@@ -149,107 +143,155 @@ Triggered by `lint` or `wiki 점검해줘`. Detect:
 - **Missing pages** — concepts mentioned repeatedly without a dedicated page.
 - **Missing cross-refs** — two pages clearly related but with no link between them.
 - **Data gaps** — holes that a web search could fill.
-- **Proposed-card review (promote / edit / drop)** — walk every card with `status: proposed` across the current wiki. With multi-source context now available, decide per card:
-  - **promote** → set `status: active` in the frontmatter, then call `python tools/instill_sched.py enroll --id <id> --importance <h/m/l> --topic <topic>`.
-  - **edit** → refine the `claim` text (id stays), then promote.
-  - **drop** → set `status: skipped` (no enroll). Removed from candidate pool, frontmatter entry kept for traceability.
-  Present candidates to the user grouped by `topic`, identified by `claim` text — **never by `id`**. Batch the decisions and confirm in one round.
-- **Active-card drift** — for every `status: active` card, check whether the `claim` text in the wiki still matches what was enrolled. If the wiki claim was rewritten, id+history stay; just note the refresh (no scheduler call needed — the LLM reads `claim` from frontmatter at session time). If the `claim` was removed from the wiki entirely, propose `skip` and on user OK call `skip --id <id>` and set frontmatter `status: skipped`.
+- **Topic-tag hygiene** — for the FSRS scheduler (§4.4):
+  - **Enroll candidates** — topics that have appeared in recent `wiki/_instill/*.md` session logs but are not in `instill/_deck.json`. Propose to the user grouped by wiki page; on OK call `python tools/instill_sched.py enroll --topic <tag> --importance <h/m/l> --anchor <page-path>`.
+  - **Stale topics** — enrolled topics whose wiki anchor page no longer exists (deleted/renamed). Propose `skip` and on OK call `python tools/instill_sched.py skip --topic <tag>`.
+  - **Tag duplicates** — two topic tags that clearly mean the same thing (e.g., `kohn-sham-veff` and `kohn-sham-v-eff`). Surface to user; manual reconciliation (silent rename forbidden — kills cumulative history).
 
-Record findings in `wiki/log.md` under a `lint` entry. Auto-fix mechanical issues (e.g., add a backlink for an orphan). Surface judgment calls (contradictions, card promotion/drop) to the user.
+Record findings in `wiki/log.md` under a `lint` entry. Auto-fix mechanical issues (e.g., add a backlink for an orphan). Surface judgment calls (contradictions, topic enroll/skip, tag duplicates) to the user.
 
-### 4.4 Instill — pushing knowledge into the user (FSRS + SOLO)
+### 4.4 Instill — pushing knowledge into the user (topic-level FSRS + dynamic questions)
 
-**Trigger**: the user says `instill` (mixed deck) or `instill <topic>` (topic-scoped).
+**Trigger**:
+- `instill` — mixed deck, interleaved across topics (default).
+- `instill <topic-or-page>` — scoped to one topic tag or wiki page.
+- `instill --review` / "약점 정리해줘" — weak-topic refresher only, no new topics introduced.
 
-**How it differs from query**: in query, the LLM answers. In instill, **the user answers and the LLM grades**.
+**How it differs from query**: in query, the LLM answers from the wiki. In instill, **the user answers and the LLM grades** — and the LLM's *question* is composed freshly from the wiki page each time, not from a frozen claim text.
 
 **Foundations (learning science)**:
 - **Testing effect** — retrieval beats re-reading (Roediger & Karpicke 2006).
-- **Spacing effect** — spaced practice retains more than massed (Cepeda et al. 2008). Scheduling uses **FSRS-5** (the algorithm family Anki adopted in 2024+).
-- **Desirable difficulties** — interleave topics; aim for a small failure rate (Bjork).
-- **Mastery learning** — one correct retrieval ≠ mastered. Multiple successes across spaced sessions are required.
-- **SOLO taxonomy** — five levels of depth: recall / uni / multi / relational / transfer (Biggs).
+- **Spacing effect** — spaced practice retains more (Cepeda et al. 2008). Scheduling uses **FSRS-5** (the Anki algorithm family).
+- **Encoding variability** — *varying* the retrieval cue across episodes strengthens memory more than repeating the identical cue (Bjork 1972; Smith & Handy 2014). **This is why the scheduling unit is the *topic*, not a fixed card text** — the same concept is probed from a different angle each session.
+- **Desirable difficulties** — interleave topics; aim for a small failure rate; allow generation effort before showing the answer (Bjork).
+- **Mastery learning** — one ✓ ≠ mastered. Multiple ✓ across spaced sessions are required.
 
-**Scheduler**: `tools/instill_sched.py` owns all FSRS math. The LLM only calls the CLI — never compute stability/difficulty in-context.
+**Unit of scheduling**: the **topic tag** (kebab-case, e.g., `picd`, `in-situ-acetylation`, `cc-skills-lazy-load`). A topic is a durable concept whose questions can vary forever. Cards/claims are *not* the unit — the wiki page is.
+
+**Scheduler**: `tools/instill_sched.py` owns all FSRS math, keyed by topic. State lives in `instill/_deck.json`. The LLM only calls the CLI — never computes FSRS in-context.
 
 **Session flow**:
 
-1. **Pull today's queue**: `python tools/instill_sched.py today [--topic X] --limit 8 --new-limit 3`. Receives JSON with `due` and `new_candidates`.
-2. **New-card preview**: if `new_candidates` is non-empty (these are cards just promoted from `proposed` by the last lint), show them to the user as a topic-grouped list of `claim` text — **never show the `id`**. Ask "any you'd like to skip?". For each one the user names (by claim or by ordinal like "the second one"), the LLM maps it to `id` internally and calls `python tools/instill_sched.py skip --id X`.
-3. **Begin the session**: up to 8 cards (due + new ≤ 3). Interleave the order.
-4. **Per card** (the scheduler returns `id` only — text lives in the wiki):
-   - **Look up the card's `claim`** by `id` in the corresponding wiki page's frontmatter `instill:` array. Read the `solo-target` too.
-   - Pick a question type appropriate for this card (see SOLO table below).
-   - User answers. Keep the LLM side short — one card = one question's worth of exchange.
-   - LLM assigns a grade, then calls `python tools/instill_sched.py review --id X --grade {again,hard,good,easy}`.
-5. **After 8 cards**: ask whether to continue. If the user signals "keep going" (any natural phrasing — "더 해줘", "조금 더", "more", etc.), add 4 more cards. Otherwise end.
-6. **Session end**: update `instill/<topic>.md` for each touched topic with narrative notes (mastered, in-progress, weaknesses, strengths). Append one line to `wiki/log.md`.
+1. **Pre-check (dynamic scan)**: scan recent `wiki/_instill/*.md` logs in scope. If the last session left weak topics (verdict ✗ or unresolved ~), offer **once**: "지난 세션에서 약점이었던 토픽 먼저 짚고 갈까요?" Decline → proceed without re-asking.
+2. **Pull today's queue**: `python tools/instill_sched.py today [--topic X] --limit 8 --new-limit 3`. Returns JSON with `due` (topics due today, FSRS-prioritized) and `new_candidates` (topics enrolled but never reviewed).
+3. **New-topic preview**: if `new_candidates` non-empty, list them by topic name + wiki anchor; ask "skip any?". Skipped topics → `python tools/instill_sched.py skip --topic X`.
+4. **Depth mix** (default): **recall 1-2 + reasoning 2-3 + synthesis 1 = 5 questions**. User can override at session start ("recall만", "synthesis 위주", "재출제 우선"). For `instill --review`, all from weak-topic backlog.
+5. **Per question**:
+   - Topic chosen from the queue (interleaved).
+   - **Compose the question fresh from the full wiki page (+ cross-linked pages).** Apply Question Quality rules below. The wiki is the *carrier*; the topic tag is just the address.
+   - User answers.
+   - Assign **verdict ∈ {✓ correct, ~ partial, ✗ wrong}** and state it explicitly.
+   - On ~ or ✗ → **Socratic, up to 1-2 sub-questions** to let the user self-correct. After that, give the wiki-cited explanation. Do not drag Socratic past 2 turns (Bjork: generation effort yes; frustration no).
+   - Map verdict → FSRS grade and call `python tools/instill_sched.py review --topic X --grade {again,hard,good,easy}` (mapping below).
+6. **After 5 questions**: offer to continue (any phrasing — "더 해줘", "more"). If yes, add 3-5 more (still interleaved).
+7. **Reverse mode** (offer 1-2× per session or on user request): user explains a concept in their own words → LLM compares to wiki, scores with the same verdict scheme. This catches mental-model gaps that Q&A doesn't surface.
+8. **Session end**:
+   - Save `wiki/_instill/<YYYY-MM-DD>-<scope-slug>.md` (format below). Same-day same-scope gets `-2`, `-3` suffix.
+   - For each touched topic, update `instill/<topic>.md` narrative coaching notes.
+   - If any topic accumulated **≥ 2 cumulative ✗** across history (scan logs), propose adding a `## Common confusion: <topic>` section to its wiki page.
+   - Append a one-line summary to `wiki/log.md`.
 
-**Grade rubric**:
+**Verdict → FSRS grade mapping**:
 
-| Grade | Criterion | Effect |
+| Verdict | Criterion | FSRS grade |
 |---|---|---|
-| **Again** | Core missed or wrong. Still wrong after a counter-question/hint. | lapse +1, short re-interval. Candidate for SOLO target one step lower. |
-| **Hard** | Partial; got it after one hint. | Same SOLO target, slightly longer interval. |
-| **Good** | Correct. | Same target, standard interval. |
-| **Easy** | Correct + unprompted connection or application. | Candidate for SOLO target one step higher. Long interval. |
+| ✗ wrong | Core missed; still wrong after Socratic. | **again** (lapse +1, short re-interval) |
+| ~ partial | Got it after 1 sub-question, or partial credit. | **hard** (small interval bump) |
+| ✓ correct | Clean answer. | **good** (standard interval) |
+| ✓ + unprompted connection | Correct *and* spontaneously linked to another concept / proposed an application. | **easy** (long interval) |
 
-**SOLO ↔ question type**:
+**Question types** (depth mix):
 
-| SOLO | Description | Example question |
+| Type | Description | Example |
 |---|---|---|
-| recall | factual recall | "What is X?" |
-| uni | one aspect | "Name one key property of X." |
-| multi | multiple aspects | "Describe the two stages of X." |
-| relational | relations, distinctions, rationale | "How does X differ from Y? Why is it designed that way?" |
-| transfer | application | "How would you use X in a new situation Z?" |
+| recall | factual recall | "PICD 의 PI 와 CD 는 각각 무엇의 약자입니까?" |
+| reasoning | apply wiki facts to a scenario | "PET 가공 중 비산 모노머가 검출됩니다. [[ionic-liquid-polyester-additive]] 첨가가 왜 효과적일지 메커니즘으로 설명해 보세요." |
+| synthesis | combine multiple pages | "PICD 와 PIT 의 내후성 차이를 CHDA vs TPA 의 구조적 출처로 설명해 보세요." |
 
-A card's `solo-target` is the *final* depth to reach. Start at recall and climb toward the target as grades trend upward.
+**Question quality** (the carrier matters — this is what makes questions rich, not thin):
+
+A good instill question is **context-rich, single-answer, and concept-probing**.
+
+Required:
+- **Carrier = wiki page(s), not a frozen claim.** Open the relevant wiki page + cross-links *before* composing. The question's information density mirrors the carrier's — short claim → thin question; full page → rich question.
+- **Set context in 1-2 sentences** before the question proper. A concrete scenario, an analogy, or a specific comparison anchors the user.
+- **Converge on a single defensible answer.** If two well-informed readers could answer differently and both be right, the question is too open. Rephrase until there's one obvious right answer.
+- **Probe the concept, not a buzzword.** Don't ask the user to retrieve a term by name — ask them to reason about the mechanism and let the term emerge.
+
+Forbidden:
+- Bare interrogatives: "X 가 뭐예요?", "왜 필요해요?", "X 의 핵심이 뭐죠?"
+- Unbounded answer-space: "어떻게 생각하세요?", "한 줄로 정리하면?"
+- Pure name-recall unless the term itself is the target.
+
+Example transformation:
+- ✗ Too thin: "PICD 직접 중합이 왜 안 되나요?"
+- ✓ Rich + converging: "ISB 와 CHDA 를 그냥 용융 중합하면 Garaleh 그룹은 Mn 11,000 에서 멈췄어요. 무엇이 그 한계의 출처이고, [[in-situ-acetylation]] 가 어떤 메커니즘으로 그 한계를 푸는지 한 문장으로 답해 보세요."
 
 **Principles**:
 - **Ask first, explain second.** Never lecture before the user attempts.
-- **If they don't know, give a hint before giving the answer.** Self-correction yields the strongest retention.
-- **Confirmations must be specific**: not "correct" but "*synthesizing at ingest time* — that's the key part you nailed."
-- **Keep replies short.** No tables or sectioned essays like in query. One or two sentences plus one question.
-- **Don't demand long explanations from the user.** The user answers the *core direction* / *choice* / *short answer*. The LLM supplies the mechanism, the "why", and any deeper connection in its follow-up — even when the card's `solo-target` is `relational` or `transfer`. Phrase questions to converge on a short answer (a choice, a placement, a single concept), not on a paragraph of reasoning. The retrieval load stays on the user; the explanatory load stays on the LLM.
-- **The wiki is read-only during a session.** Scheduler calls only mutate `instill/_deck.json`; `wiki/` and `raw/` are untouched.
-- **Interleaving is the default.** Topic-scoped (`instill <topic>`) is allowed but Bjork supports mixing.
-- **Never expose card `id` to the user.** Ids are internal scheduler handles. In every user-facing message — preview, drop prompt, lint card review, narrative notes, log entries — refer to cards by `topic` + `claim` text. When the user names a card ambiguously, resolve by claim match or ordinal, not by asking for an id.
+- **Hint before answer.** Socratic 1-2회 후에만 정공법으로.
+- **Confirmations must be specific**: not "맞아요" but "*Ac₂O 가 OH 를 활성화해 leaving group 을 만든다* — 그 메커니즘이 핵심이었습니다."
+- **Sycophancy 금지.** 모호한 답을 "거의 맞아요"로 ~를 ✓로 밀어 올리지 않는다. 약점 추적이 거짓이 되면 instill 전체 가치가 무너진다. 어조는 존댓말 유지 (단호함과 무례함은 별개).
+- **Correction은 wiki 인용 동반.** Chat 안에서만 떠도는 정정은 휘발한다. 정정 시 반드시 `[[concepts/foo]]` 링크 + 메커니즘 설명.
+- **User reply 부담 최소화.** 사용자는 *방향·선택·짧은 답*만. 메커니즘·"왜"·연결은 LLM이 follow-up 에 공급.
+- **Wiki는 세션 중 read-only.** 스케줄러 호출만 `instill/_deck.json` 갱신. 페이지 편집은 세션 종료 후 Common confusion 추가 시에만.
+- **Topic tag discipline.** kebab-case. 새 topic 만들기 전 기존 topic 재사용 우선 (`instill/_deck.json` 의 키 확인). Silent rename 금지 — 누적 추적 망가짐. 모호하면 사용자에게 분류 묻기.
+- **Interleaving 기본.** Topic-scope (`instill <topic>`) 가능하지만 mixed 가 default.
+- **Lifecycle 침범 금지.** Instill 외부 세션(ingest, query)에서 "이거 약하니 공부하세요" 같은 제안 금지. 학습 lifecycle 은 사용자 영역.
 
-**Question quality** (critical — bad questions kill the session):
+**Session log — `wiki/_instill/<YYYY-MM-DD>-<scope-slug>.md`**:
 
-A good instill question is **context-rich, single-answer, and concept-probing**. The card's `claim` is the *target understanding* — the question must elicit that specific understanding, not let the user guess at what you're asking.
+```yaml
+---
+type: instill
+created: YYYY-MM-DD
+scope: concepts/picd.md       # 또는 topic 문자열, 또는 "mixed"
+depth_mix: {recall: 2, reasoning: 2, synthesis: 1}
+topics_touched: [picd, in-situ-acetylation, isosorbide]
+prior_session: 2026-05-26-picd.md   # 연속 세션이면 (선택)
+---
 
-Required:
-- **Set context in 1–2 sentences** before the question proper. A concrete scenario, an analogy, or a specific comparison. Bare interrogatives like "X 가 뭐예요?" or "왜 필요해요?" are too thin — the user has no anchor for what's being probed.
-- **Converge on a single defensible answer.** If two well-informed readers could answer differently and both be valid, the question is too open. Rephrase until there is one obvious right answer (the card's claim, or a tight equivalent).
-- **Probe the concept, not a buzzword.** Don't ask the user to retrieve a specific term like "active recall" by name — ask them to reason about the underlying mechanism and let the term emerge.
+## Summary
+- ✓ 3 / ~ 1 / ✗ 1
+- 약점: in-situ-acetylation (Socratic 후에도 ✗ → 다음 세션 first-up; 누적 ✗ 3회 → Common confusion 후보)
+- 호조: picd-monomer-pair (지난 세션 ✗ → 이번 ✓)
 
-Forbidden:
-- Vague open-enders: "왜 X 가 필요한가요?", "X 는 어떤 거예요?", "X 의 핵심이 뭐죠?"
-- Questions whose answer-space is unbounded ("어떻게 생각하세요?", "한 줄로 정리하면?")
-- Pure name-recall ("이걸 뭐라고 부르죠?") unless the term itself is the card's claim.
+## Q&A
 
-Example transformation:
-- ✗ Too thin: "instill 이 query 와 별도로 왜 필요한가요?"
-- ✓ Rich + converging: "교과서를 5번 정독한 학생 A 와, 1번 읽고 4번은 책 덮고 머릿속에서 꺼내려 노력한 학생 B 가 있어요. 일주일 뒤 누가 더 잘 기억할까요? 그리고 이 결과가 instill 이 query 와 별도 동작인 이유와 어떻게 연결되나요?"
+### Q1 [reasoning | topic: in-situ-acetylation]
+**Q**: ...
+**A (user)**: ...
+**Verdict**: ✗
+**Socratic**:
+- sub-Q: ... → sub-A: ... → ~
+**Correction**: [[concepts/in-situ-acetylation]] 인용 + 메커니즘 설명.
+**Re-test scheduled**: ✓
 
-**Backlog overflow**: if due > 8, the scheduler sorts by priority (lapses → most overdue → importance) and returns only the top. Untreated due cards do not disappear — they roll forward.
+### Q2 [recall | topic: picd-monomer-pair]
+...
+```
+
+Verdict 한 글자(✓/~/✗) → grep 으로 약점 집계. Topic tag → 시간순 추적. Wiki 인용은 markdown link 로 (one-click 후속 학습).
 
 **Narrative notes — `instill/<topic>.md`** (lazy-load):
 
-Separately from the quantitative state in `_deck.json`, per-topic coaching notes live in `instill/<topic>.md` as markdown: mastered concepts, weakness/strength patterns, session log. Normal sessions do NOT read these files — only instill sessions touching the topic do.
+Per-topic 장기 코칭 노트: mastered concepts, weakness/strength patterns, multi-session 누적 메모. 정상 세션은 읽지 않음 — 해당 topic 을 다루는 instill 세션만 읽고 갱신.
+
+**Common confusion (wiki 역방향 갱신)**:
+
+같은 topic 이 누적 ✗ ≥ 2회 → 해당 wiki 페이지에 `## Common confusion: <topic>` 섹션 추가 제안. 사용자가 헷갈렸던 지점·올바른 mental model 을 한국어로 정리. 승인 시 페이지 편집 + 일반 wiki 갱신처럼 log.md 에 기록.
+
+**Backlog overflow**: due > 8 이면 스케줄러가 우선순위(lapses → most overdue → importance)로 상위 N 만 반환. 미처 다루지 못한 due 는 다음 날로 자동 roll forward (FSRS 가 알아서 처리).
 
 **`wiki/log.md` entry format**:
 
 ```
-## [YYYY-MM-DD] instill | <mixed | topic>
-- cards: 8 (due 6 / new 2). grades: 4G/2H/2A.
-- topics touched: cc-memory, cc-skills
-- strengths: ...
-- weaknesses: ...
-- end: completed-deck / extended / user-stopped
+## [YYYY-MM-DD] instill | <mixed | scope>
+- questions: 5 (recall 2 / reasoning 2 / synthesis 1). verdict: 3✓ / 1~ / 1✗
+- topics touched: picd, in-situ-acetylation, isosorbide
+- weak: in-situ-acetylation (누적 ✗ 3회 — Common confusion 제안)
+- log: [[../_instill/2026-05-27-picd.md]]
+- end: completed / extended / user-stopped
 ```
 
 ---
@@ -283,7 +325,6 @@ Append-only. The newest entry is at the **bottom**, not the top (chronological).
 ## [2026-05-25] ingest | Karpathy — LLM Wiki
 - raw: raw/karpathy-llm-wiki.md
 - new: [[sources/karpathy-llm-wiki]], [[concepts/llm-wiki-pattern]], [[concepts/three-layer-architecture]], [[entities/obsidian]]
-- new cards: 7
 - updated: [[index]]
 
 ## [2026-05-26] query | RAG vs wiki, key difference?
@@ -293,13 +334,14 @@ Append-only. The newest entry is at the **bottom**, not the top (chronological).
 ## [2026-05-30] lint
 - orphans 2: [[entities/marp]], [[entities/dataview]] → added to index
 - contradictions 0
+- topic-hygiene: enroll candidates 3 (picd, in-situ-acetylation, isosorbide), stale 0
 
 ## [2026-06-01] instill | mixed
-- cards: 8 (due 6 / new 2). grades: 5G/2H/1A.
+- questions: 5 (recall 2 / reasoning 2 / synthesis 1). verdict: 3✓ / 1~ / 1✗
 - topics touched: rag-vs-wiki, llm-wiki-pattern
-- strengths: distinguishes synthesis timing
-- weaknesses: contradiction detection mechanism
-- end: completed-deck
+- weak: contradiction-detection (누적 ✗ 2회 — Common confusion 제안)
+- log: [[../_instill/2026-06-01-mixed.md]]
+- end: completed
 ```
 
 ---
@@ -347,15 +389,16 @@ Honor the choice and **record it** in `.python-policy` at the repo root (one of 
 
 Natural language — no slash commands.
 
-- `raw/X.md ingest 해줘` — run ingest (auto card extraction included)
+- `raw/X.md ingest 해줘` — run ingest (no card extraction; topics emerge during instill sessions)
 - `Q 답해줘` / `Q에 대해 wiki에 뭐가 있어?` — run query
 - `instill` — start instill session with the mixed deck (default, interleaved)
-- `instill <주제>` — topic-scoped instill session
+- `instill <주제-or-page>` — scoped instill session (topic tag or wiki page path)
+- `instill --review` / "약점 정리해줘" — weak-topic refresher only
 - Continue / stop signals during a session are recognized from natural phrasing — no fixed keyword. "더 해줘", "more", "충분해", "그만", "stop" all work. Interpret intent, not literal tokens.
 - `lint` / `wiki 점검해줘` — run lint
 - `index 보여줘` — print `wiki/index.md`
 - `최근 활동` — print the last N entries of `wiki/log.md`
-- `상태` / `progress` / `stats` — run `python tools/instill_sched.py stats` and report deck size, by-state breakdown, due-today count, average stability
+- `상태` / `progress` / `stats` — run `python tools/instill_sched.py stats` and report deck size (topics), by-state breakdown, due-today count, average stability
 
 ---
 
