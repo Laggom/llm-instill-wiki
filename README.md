@@ -71,13 +71,28 @@ ingest, query, lint 는 흔합니다. instill 이 다른 점이에요.
 
 ## 시작하는 법
 
+한 줄로 설치하실 수 있습니다.
+
+**macOS / Linux / WSL**
 ```bash
-git clone https://github.com/Laggom/llm-instill-wiki my-wiki
-cd my-wiki
-mkdir raw wiki instill
+curl -fsSL https://raw.githubusercontent.com/Laggom/llm-instill-wiki/main/install.sh | bash
 ```
 
-그리고 이 디렉터리에서 Claude Code 를 실행하시면 됩니다. `CLAUDE.md` 가 자동으로 컨텍스트에 들어가서 운영 규칙이 즉시 적용돼요.
+**Windows PowerShell**
+```powershell
+irm https://raw.githubusercontent.com/Laggom/llm-instill-wiki/main/install.ps1 | iex
+```
+
+스크립트가 repo 를 `./llm-instill-wiki` 로 clone 하고, 필요한 디렉터리 (`raw/`, `wiki/`, `instill/`) 를 만들고, `wiki/index.md`·`wiki/log.md` 골격을 초기화하고, Python 환경을 확인하고, 스케줄러 동작까지 점검해줍니다.
+
+이미 clone 하신 분은 repo 안에서 직접 실행하셔도 됩니다.
+
+```bash
+bash install.sh        # macOS / Linux / WSL
+./install.ps1          # Windows PowerShell
+```
+
+설치가 끝나면 그 디렉터리에서 Claude Code (또는 Cursor·Codex·Gemini CLI) 를 실행하시면 됩니다. `CLAUDE.md` 가 자동으로 컨텍스트에 들어가서 운영 규칙이 즉시 적용돼요.
 
 처음에 해볼 만한 흐름은 이렇습니다.
 
@@ -111,26 +126,29 @@ A Claude Code operational schema implementing an LLM-maintained personal wiki la
 
 ## Installation (run this when the user clones the repo)
 
-When a user has just cloned this repo and asks you to set it up, perform these steps. Detect the host tool first — different tools auto-load different filenames.
+The repo ships with `install.sh` (Unix) and `install.ps1` (Windows PowerShell). Both are idempotent and do the full setup: clone if needed, verify Python 3.10+, create gitignored content directories (`raw/`, `wiki/sources|concepts|entities/`, `instill/`), scaffold `wiki/index.md` and `wiki/log.md`, and smoke-test the scheduler.
 
-**1. Verify Python.** Required for `tools/instill_sched.py`.
-
-```bash
-python --version    # need >= 3.10
-```
-
-If missing or too old, instruct the user to install Python 3.10+. The scheduler uses stdlib only; no `pip install` needed.
-
-**2. Create the gitignored content directories.**
+When a user has just cloned and asks you to set up, instruct them to run the appropriate script:
 
 ```bash
-mkdir -p raw wiki instill
-mkdir -p wiki/sources wiki/concepts wiki/entities
+# macOS / Linux / WSL
+bash install.sh
+
+# Windows PowerShell
+./install.ps1
 ```
 
-**3. Schema wiring (already handled).**
+If the user has nothing yet, the one-liner does clone + setup in one shot:
 
-`AGENTS.md` and `GEMINI.md` already exist in the repo as one-line pointer files that redirect the agent to `CLAUDE.md`. No action needed for any of the supported host tools:
+```bash
+curl -fsSL https://raw.githubusercontent.com/Laggom/llm-instill-wiki/main/install.sh | bash
+# or
+irm https://raw.githubusercontent.com/Laggom/llm-instill-wiki/main/install.ps1 | iex
+```
+
+The scripts skip steps that are already done (existing dirs, existing `index.md`/`log.md`), so re-running is safe. If a step fails (Python missing, scheduler error), the script aborts with a clear message — do not work around it; surface it to the user.
+
+**Schema wiring**: `AGENTS.md` and `GEMINI.md` already exist in the repo as one-line pointer files that redirect agents to `CLAUDE.md`. No copy or symlink step is needed for any supported host tool:
 
 | Host tool | Auto-loaded file | Behavior |
 |---|---|---|
@@ -141,33 +159,7 @@ mkdir -p wiki/sources wiki/concepts wiki/entities
 
 `CLAUDE.md` is the single source of truth. Never edit `AGENTS.md` or `GEMINI.md` — they are intentionally minimal pointers.
 
-**4. Initialize empty wiki scaffolding** so subsequent workflows have files to update:
-
-```bash
-# wiki/index.md
-cat > wiki/index.md <<'EOF'
-# Index
-
-## Sources
-## Concepts
-## Entities
-EOF
-
-# wiki/log.md
-echo "# Log" > wiki/log.md
-```
-
-**5. Sanity-check the scheduler.**
-
-```bash
-python tools/instill_sched.py stats
-```
-
-Expected: `{"total": 0, "by_state": {}, "due_today": 0, ...}`. If you see a stack trace, do not proceed — surface the error to the user.
-
-**6. Confirm to the user.** Tell them setup is done and suggest the first action: drop a source file into `raw/` and ask for ingest.
-
-Do **not** create any sample raw/wiki content unless the user asks. The schema is content-agnostic; their first source should be their own.
+After setup, tell the user the first action: drop a source file into `raw/` and ask for ingest. Do **not** create any sample raw/wiki content unless the user asks.
 
 ## Source of truth
 
@@ -187,8 +179,10 @@ If `CLAUDE.md` and this README disagree, `CLAUDE.md` wins.
 ## Layout
 
 ```
-CLAUDE.md                       schema (operative rules)
+CLAUDE.md                       schema (operative rules, source of truth)
+AGENTS.md, GEMINI.md            pointers redirecting alt-tool agents to CLAUDE.md
 README.md                       human + this agent guide
+install.sh, install.ps1         setup scripts (idempotent)
 tools/instill_sched.py          FSRS-4.5 scheduler (stdlib only, CLI)
 raw/        (gitignored)        immutable source clippings
 wiki/       (gitignored)        LLM-maintained pages: sources/, concepts/, entities/, index.md, log.md

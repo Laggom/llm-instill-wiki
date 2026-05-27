@@ -23,6 +23,8 @@ This file is the **schema** for this wiki. It defines the structure, format, and
 ├── AGENTS.md          # pointer → CLAUDE.md (auto-loaded by Cursor / Codex)
 ├── GEMINI.md          # pointer → CLAUDE.md (auto-loaded by Gemini CLI)
 ├── README.md          # human-facing intro + agent installation guide
+├── install.sh         # setup script (macOS / Linux / WSL)
+├── install.ps1        # setup script (Windows PowerShell)
 ├── tools/
 │   └── instill_sched.py   # FSRS-4.5 scheduler (stdlib only)
 ├── raw/               # source clippings (IMMUTABLE — never edit or delete)
